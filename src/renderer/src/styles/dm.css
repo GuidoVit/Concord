@@ -65,12 +65,7 @@
 
   box-shadow:
     0 3px 13px
-    rgba(
-      39,
-      224,
-      179,
-      0.28
-    );
+    rgba(var(--mint-rgb), 0.28);
 
   font-size: 8px;
 
@@ -546,21 +541,11 @@
 
 .dm-composer input:focus {
   border-color:
-    rgba(
-      39,
-      224,
-      179,
-      0.35
-    );
+    rgba(var(--mint-rgb), 0.35);
 
   box-shadow:
     0 0 0 3px
-    rgba(
-      39,
-      224,
-      179,
-      0.035
-    );
+    rgba(var(--mint-rgb), 0.035);
 }
 
 .dm-composer button {
@@ -605,12 +590,7 @@ button.friend-card {
 
 button.friend-card:hover {
   border-color:
-    rgba(
-      39,
-      224,
-      179,
-      0.2
-    );
+    rgba(var(--mint-rgb), 0.2);
 
   background:
     var(--panel-2);

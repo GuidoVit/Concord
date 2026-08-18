@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { FormEvent, RefObject } from 'react'
-import type { LocalVideoTrack, RemoteVideoTrack } from 'livekit-client'
+import type { FormEvent } from 'react'
 
 import type {
   ConcordServer,
@@ -16,6 +15,7 @@ import { Avatar } from '../common/Avatar'
 import { MessageAttachmentView } from '../common/MessageAttachmentView'
 import { Modal } from '../common/Modal'
 import { VoiceRoom } from '../voice/VoiceRoom'
+import type { ActiveScreenShare } from '../../hooks/useScreenShare'
 
 export function ServerScreen({
   server,
@@ -33,11 +33,10 @@ export function ServerScreen({
   setScreenShareVolume,
   screenSharing,
   screenShareStarting,
-  screenTrack,
-  screenSharerName,
-  screenSharerIdentity,
+  screenShares,
+  selectedScreenShareIdentity,
+  selectScreenShare,
   screenQuality,
-  screenVideoRef,
   connectVoice,
   disconnectVoice,
   toggleMicrophone,
@@ -63,11 +62,10 @@ export function ServerScreen({
   setScreenShareVolume: (identity: string, volume: number) => void
   screenSharing: boolean
   screenShareStarting: boolean
-  screenTrack: RemoteVideoTrack | LocalVideoTrack | null
-  screenSharerName: string
-  screenSharerIdentity: string
+  screenShares: ActiveScreenShare[]
+  selectedScreenShareIdentity: string
+  selectScreenShare: (identity: string) => void
   screenQuality: ScreenShareQuality
-  screenVideoRef: RefObject<HTMLVideoElement | null>
   connectVoice: (channelId: string) => Promise<void> | void
   disconnectVoice: () => Promise<void> | void
   toggleMicrophone: () => void
@@ -475,11 +473,10 @@ export function ServerScreen({
             setScreenShareVolume={setScreenShareVolume}
             screenSharing={connectedHere && screenSharing}
             screenShareStarting={screenShareStarting}
-            screenTrack={connectedHere ? screenTrack : null}
-            screenSharerName={screenSharerName}
-            screenSharerIdentity={screenSharerIdentity}
+            screenShares={connectedHere ? screenShares : []}
+            selectedScreenShareIdentity={selectedScreenShareIdentity}
+            selectScreenShare={selectScreenShare}
             screenQuality={screenQuality}
-            screenVideoRef={screenVideoRef}
             connectVoice={connectVoice}
             disconnectVoice={disconnectVoice}
             toggleMicrophone={toggleMicrophone}

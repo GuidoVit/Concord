@@ -1,11 +1,10 @@
+import { Mascot } from './Mascot'
+
 export function Logo() {
   return (
     <div className="logo">
       <div className="logo-mascot">
-        <img
-          src="./concord-mascot.png"
-          alt="Mascote Concord"
-        />
+        <Mascot alt="Mascote Concord" />
       </div>
 
       <div>

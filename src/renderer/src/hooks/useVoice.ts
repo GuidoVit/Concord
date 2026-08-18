@@ -69,6 +69,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
   const remotePipelinesRef = useRef<Map<string, RemoteAudioPipeline>>(new Map())
   const remoteTracksRef = useRef<Map<string, RemoteAudioTrack>>(new Map())
   const deafenedRef = useRef(false)
+  const activeScreenShareIdentityRef = useRef('')
 
   useEffect(() => {
     mutedRef.current = muted
@@ -425,14 +426,42 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
   const setScreenShareVolume = useCallback(
     (identity: string, volume: number) => {
       const safe = clampVolume(volume)
+
       setScreenShareVolumes((current) => {
         const next = { ...current, [identity]: safe }
         localStorage.setItem('concord-screen-volumes', JSON.stringify(next))
         return next
       })
-      applyAudioVolume(identity, Track.Source.ScreenShareAudio, safe)
+
+      // O volume configurado é preservado para cada transmissão, mas somente
+      // a transmissão principal selecionada pode produzir áudio.
+      applyAudioVolume(
+        identity,
+        Track.Source.ScreenShareAudio,
+        activeScreenShareIdentityRef.current === identity ? safe : 0
+      )
     },
     [applyAudioVolume]
+  )
+
+  const setActiveScreenShareAudio = useCallback(
+    (identity: string) => {
+      activeScreenShareIdentityRef.current = identity
+
+      remoteTracksRef.current.forEach((_track, key) => {
+        const suffix = `:${Track.Source.ScreenShareAudio}`
+        if (!key.endsWith(suffix)) return
+
+        const trackIdentity = key.slice(0, -suffix.length)
+        const volume =
+          trackIdentity === identity
+            ? (screenShareVolumes[trackIdentity] ?? 1)
+            : 0
+
+        applyAudioVolume(trackIdentity, Track.Source.ScreenShareAudio, volume)
+      })
+    },
+    [applyAudioVolume, screenShareVolumes]
   )
 
   const disconnectVoice = useCallback(async () => {
@@ -448,6 +477,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     setVoiceParticipants([])
     setConnectedServerId('')
     setConnectedChannelId('')
+    activeScreenShareIdentityRef.current = ''
     setMuted(false)
     setDeafened(false)
     mutedRef.current = false
@@ -490,9 +520,14 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
 
           const source = publication.source
           const identity = participant.identity
-          const volume = source === Track.Source.ScreenShareAudio
-            ? (screenShareVolumes[identity] ?? 1)
-            : (participantVolumes[identity] ?? 1)
+          const volume =
+            source === Track.Source.ScreenShareAudio
+              ? (
+                  activeScreenShareIdentityRef.current === identity
+                    ? (screenShareVolumes[identity] ?? 1)
+                    : 0
+                )
+              : (participantVolumes[identity] ?? 1)
 
           void createRemotePipeline(track, identity, source, volume)
         })
@@ -609,6 +644,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     screenShareVolumes,
     setParticipantVolume,
     setScreenShareVolume,
+    setActiveScreenShareAudio,
     connectVoice,
     disconnectVoice,
     toggleMicrophone,

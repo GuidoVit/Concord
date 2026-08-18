@@ -111,8 +111,17 @@ export function SocialSidebar({
         </div>
 
         <button
+          onClick={openProfileSettings}
+          title="Configurações"
+          aria-label="Abrir configurações do Concord"
+        >
+          ⚙
+        </button>
+
+        <button
           onClick={logout}
           title="Sair"
+          aria-label="Sair do Concord"
         >
           ↪
         </button>

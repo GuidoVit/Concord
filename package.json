@@ -1,6 +1,6 @@
 {
   "name": "concord",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Concord - chat, servidores, chamadas de voz, compartilhamento de tela e atualizações automáticas",
   "main": "./out/main/index.js",
   "author": "Vitor Kallas",

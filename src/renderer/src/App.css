@@ -7,3 +7,5 @@
 @import './styles/screen.css';
 @import './styles/dm.css';
 @import './styles/overrides.css';
+
+@import './styles/theme.css';

@@ -79,7 +79,7 @@
 
   border:
     1px solid
-    rgba(39, 224, 179, 0.18);
+    rgba(var(--mint-rgb), 0.18);
 }
 
 .server-circle.join {
@@ -388,12 +388,12 @@
   background:
     radial-gradient(
       circle at top left,
-      rgba(246, 201, 69, 0.045),
+      rgba(var(--solar-rgb), 0.045),
       transparent 35%
     ),
     radial-gradient(
       circle at bottom right,
-      rgba(39, 224, 179, 0.035),
+      rgba(var(--mint-rgb), 0.035),
       transparent 35%
     ),
     var(--bg);
@@ -490,12 +490,12 @@
 .quick-card.solar {
   border:
     1px solid
-    rgba(246, 201, 69, 0.25);
+    rgba(var(--solar-rgb), 0.25);
 
   background:
     linear-gradient(
       135deg,
-      rgba(246, 201, 69, 0.09),
+      rgba(var(--solar-rgb), 0.09),
       var(--panel)
     );
 }
@@ -503,12 +503,12 @@
 .quick-card.mint {
   border:
     1px solid
-    rgba(39, 224, 179, 0.2);
+    rgba(var(--mint-rgb), 0.2);
 
   background:
     linear-gradient(
       135deg,
-      rgba(39, 224, 179, 0.075),
+      rgba(var(--mint-rgb), 0.075),
       var(--panel)
     );
 }
@@ -519,12 +519,12 @@
 
 .quick-card.solar:hover {
   border-color:
-    rgba(246, 201, 69, 0.5);
+    rgba(var(--solar-rgb), 0.5);
 }
 
 .quick-card.mint:hover {
   border-color:
-    rgba(39, 224, 179, 0.45);
+    rgba(var(--mint-rgb), 0.45);
 }
 
 .quick-icon {
@@ -549,14 +549,14 @@
   color: var(--solar);
 
   background:
-    rgba(246, 201, 69, 0.1);
+    rgba(var(--solar-rgb), 0.1);
 }
 
 .mint .quick-icon {
   color: var(--mint);
 
   background:
-    rgba(39, 224, 179, 0.09);
+    rgba(var(--mint-rgb), 0.09);
 }
 
 .quick-card strong {
@@ -824,7 +824,7 @@
 
   box-shadow:
     0 0 10px
-    rgba(39, 224, 179, 0.55);
+    rgba(var(--mint-rgb), 0.55);
 }
 
 .request-list {

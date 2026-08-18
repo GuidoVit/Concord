@@ -29,9 +29,12 @@ import { apiRequest } from './services/apiClient'
 import { WindowChrome } from './components/window/WindowChrome'
 import { UpdateBanner } from './components/update/UpdateBanner'
 import { useUpdater } from './hooks/useUpdater'
+import { useThemePalette } from './hooks/useThemePalette'
+import { AppearanceSettings } from './components/settings/AppearanceSettings'
 
 function App() {
   const updater = useUpdater()
+  const themePalette = useThemePalette()
 
   const [
     screen,
@@ -151,7 +154,8 @@ function App() {
   const screenShare = useScreenShare({
     livekitRoom: voice.livekitRoom,
     voiceConnected: voice.voiceConnected,
-    user
+    user,
+    onActiveScreenShareChange: voice.setActiveScreenShareAudio
   })
 
   const {
@@ -177,11 +181,10 @@ function App() {
     setShowScreenPicker,
     screenSharing,
     screenShareStarting,
-    screenTrack,
-    screenSharerName,
-    screenSharerIdentity,
+    screenShares,
+    selectedScreenShareIdentity,
+    selectScreenShare,
     screenQuality,
-    screenVideoRef,
     openScreenPicker,
     startScreenShare,
     stopScreenShare
@@ -453,17 +456,16 @@ function App() {
             screenShareStarting={
               screenShareStarting
             }
-            screenTrack={
-              screenTrack
+            screenShares={
+              screenShares
             }
-            screenSharerName={
-              screenSharerName
+            selectedScreenShareIdentity={
+              selectedScreenShareIdentity
             }
-            screenSharerIdentity={screenSharerIdentity}
+            selectScreenShare={
+              selectScreenShare
+            }
             screenQuality={screenQuality}
-            screenVideoRef={
-              screenVideoRef
-            }
             connectVoice={(channelId) => connectVoice(selectedServer, channelId)}
             disconnectVoice={
               disconnectVoice
@@ -499,7 +501,7 @@ function App() {
       )}
 
       {showProfileSettings && (
-        <Modal title="Meu perfil" close={() => setShowProfileSettings(false)}>
+        <Modal title="Configurações do Concord" close={() => setShowProfileSettings(false)}>
           <label className="settings-label">Nome de exibição</label>
           <input className="modal-input" value={profileDisplayName} onChange={(e) => setProfileDisplayName(e.target.value)} />
           <label className="settings-label">Nome de usuário</label>
@@ -508,6 +510,15 @@ function App() {
           <input className="modal-file" type="file" accept="image/*" onChange={(e) => pickProfileAvatar(e.target.files?.[0])} />
           {profileAvatar && <img className="settings-image-preview profile-preview" src={profileAvatar} alt="Prévia" />}
           <button className="primary" onClick={() => void saveProfile()}>Salvar perfil</button>
+
+          <AppearanceSettings
+            primary={themePalette.primary}
+            secondary={themePalette.secondary}
+            setPrimary={themePalette.setPrimary}
+            setSecondary={themePalette.setSecondary}
+            setPalette={themePalette.setPalette}
+            resetPalette={themePalette.resetPalette}
+          />
         </Modal>
       )}
 

@@ -1,4 +1,5 @@
 import type { ConcordServer, Screen } from '../../types/concord'
+import { Mascot } from '../common/Mascot'
 
 interface ServerRailProps {
   servers: ConcordServer[]
@@ -28,8 +29,7 @@ export function ServerRail({
         onClick={goHome}
         title="Mensagens diretas"
       >
-        <img
-          src="./concord-mascot.png"
+        <Mascot
           alt="Concord"
           className="rail-mascot-image"
         />

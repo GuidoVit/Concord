@@ -11,10 +11,14 @@
   --solar: #f6c945;
   --solar-bright: #ffdc63;
   --solar-dark: #c89a18;
+  --solar-rgb: 246, 201, 69;
 
   --mint: #27e0b3;
   --mint-bright: #58f0ca;
   --mint-dark: #109c7d;
+  --mint-rgb: 39, 224, 179;
+
+  --concord-gradient: linear-gradient(135deg, var(--solar), var(--mint));
 
   --white: #f6f7f4;
   --text: #d7dcd8;
@@ -197,7 +201,7 @@ label,
   display: flex;
   align-items: center;
   gap: 14px;
-  border: 1px solid rgba(246, 201, 69, .28);
+  border: 1px solid rgba(var(--solar-rgb), .28);
   border-radius: 13px;
   background: rgba(16, 20, 25, .97);
   box-shadow: 0 18px 55px rgba(0, 0, 0, .42);
@@ -205,7 +209,7 @@ label,
   -webkit-app-region: no-drag;
 }
 
-.update-banner.ready { border-color: rgba(39, 224, 179, .35); }
+.update-banner.ready { border-color: rgba(var(--mint-rgb), .35); }
 .update-banner.error { border-color: rgba(255, 95, 102, .35); }
 .update-banner-copy { min-width: 0; flex: 1; }
 .update-banner-copy strong { display: block; font-size: 12px; }
@@ -216,3 +220,67 @@ label,
 .update-secondary { background: var(--panel-3); color: var(--muted); }
 .update-progress { height: 5px; overflow: hidden; margin-top: 9px; border-radius: 999px; background: #242b31; }
 .update-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--solar), var(--mint)); transition: width .18s ease; }
+/* =========================================================
+   CONCORD - OCULTAR BARRAS DE ROLAGEM
+   Mantém mouse wheel, touchpad e scroll funcionando.
+   ========================================================= */
+
+/* Firefox */
+html,
+body,
+#root,
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Chrome / Chromium / Electron / Edge */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Garante que o app não crie scrollbar externa */
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* As áreas internas continuam rolando normalmente,
+   apenas sem mostrar a barra */
+.server-chat-messages,
+.server-chat,
+.voice-room,
+.voice-center,
+.discord-channels,
+.channels,
+.dm-messages,
+.friends-page,
+.screen-share-sidebar,
+.screen-share-preview-list {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.server-chat-messages::-webkit-scrollbar,
+.server-chat::-webkit-scrollbar,
+.voice-room::-webkit-scrollbar,
+.voice-center::-webkit-scrollbar,
+.discord-channels::-webkit-scrollbar,
+.channels::-webkit-scrollbar,
+.dm-messages::-webkit-scrollbar,
+.friends-page::-webkit-scrollbar,
+.screen-share-sidebar::-webkit-scrollbar,
+.screen-share-preview-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}

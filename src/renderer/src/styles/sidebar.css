@@ -126,12 +126,7 @@
   color: #0c1713;
 
   border-color:
-    rgba(
-      39,
-      224,
-      179,
-      0.55
-    );
+    rgba(var(--mint-rgb), 0.55);
 
   background:
     linear-gradient(
@@ -153,29 +148,14 @@
     var(--solar-bright);
 
   border-color:
-    rgba(
-      246,
-      201,
-      69,
-      0.35
-    );
+    rgba(var(--solar-rgb), 0.35);
 
   background:
-    rgba(
-      246,
-      201,
-      69,
-      0.08
-    );
+    rgba(var(--solar-rgb), 0.08);
 }
 
 .voice-button.screen-active:hover {
   background:
-    rgba(
-      246,
-      201,
-      69,
-      0.14
-    );
+    rgba(var(--solar-rgb), 0.14);
 }
 

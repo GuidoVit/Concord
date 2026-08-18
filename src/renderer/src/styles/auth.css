@@ -9,12 +9,12 @@
   background:
     radial-gradient(
       circle at 20% 10%,
-      rgba(246, 201, 69, 0.1),
+      rgba(var(--solar-rgb), 0.1),
       transparent 35%
     ),
     radial-gradient(
       circle at 80% 90%,
-      rgba(39, 224, 179, 0.08),
+      rgba(var(--mint-rgb), 0.08),
       transparent 35%
     ),
     var(--bg);
@@ -307,7 +307,7 @@
 
   box-shadow:
     0 0 0 3px
-    rgba(246, 201, 69, 0.08);
+    rgba(var(--solar-rgb), 0.08);
 }
 
 .field-inner b {

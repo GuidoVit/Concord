@@ -18,7 +18,10 @@ app.addContentTypeParser(
 const cors = require('@fastify/cors')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
-const { AccessToken } = require('livekit-server-sdk')
+const {
+  AccessToken,
+  RoomServiceClient
+} = require('livekit-server-sdk')
 
 const fs = require('fs')
 const path = require('path')
@@ -42,6 +45,18 @@ const LIVEKIT_API_SECRET =
 
 const LIVEKIT_URL =
   process.env.LIVEKIT_URL || 'ws://127.0.0.1:7880'
+
+const LIVEKIT_HTTP_URL =
+  LIVEKIT_URL
+    .replace(/^wss:/, 'https:')
+    .replace(/^ws:/, 'http:')
+
+const roomService =
+  new RoomServiceClient(
+    LIVEKIT_HTTP_URL,
+    LIVEKIT_API_KEY,
+    LIVEKIT_API_SECRET
+  )
 
 const JWT_SECRET =
   process.env.JWT_SECRET ||
@@ -1900,6 +1915,179 @@ async function start() {
       }
     }
   )
+
+    // ====================================================
+  // PRESENÇA NOS CANAIS DE VOZ
+  // ====================================================
+
+  app.get(
+    '/servers/:serverId/voice-presence',
+    {
+      preHandler:
+        authenticate
+    },
+
+    async (
+      request,
+      reply
+    ) => {
+      const serverId =
+        request.params
+          .serverId
+
+      const servers =
+        readServers()
+
+      const server =
+        servers.find(
+          (item) =>
+            item.id ===
+            serverId
+        )
+
+      if (
+        !server ||
+        !(
+          server.members ||
+          []
+        ).includes(
+          request.user.id
+        )
+      ) {
+        return reply
+          .code(403)
+          .send({
+            error:
+              'Você não tem acesso a este servidor.'
+          })
+      }
+
+      const voiceChannels =
+        (
+          server.channels ||
+          []
+        ).filter(
+          (channel) =>
+            channel.type ===
+            'voice'
+        )
+
+      const presence = {}
+
+      await Promise.all(
+        voiceChannels.map(
+          async (
+            channel
+          ) => {
+            const roomName =
+              `server-${server.id}-channel-${channel.id}`
+
+            try {
+              const participants =
+                await roomService
+                  .listParticipants(
+                    roomName
+                  )
+
+              presence[
+                channel.id
+              ] =
+                participants.map(
+                  (
+                    participant
+                  ) => {
+                    let avatarUrl =
+                      ''
+
+                    try {
+                      const metadata =
+                        participant.metadata
+                          ? JSON.parse(
+                              participant.metadata
+                            )
+                          : null
+
+                      avatarUrl =
+                        typeof metadata
+                          ?.avatarUrl ===
+                        'string'
+                          ? metadata
+                              .avatarUrl
+                          : ''
+                    } catch {
+                      avatarUrl =
+                        ''
+                    }
+
+                    /*
+                     * Fallback usando os dados armazenados
+                     * no próprio Concord.
+                     *
+                     * Assim, mesmo se uma sala antiga não
+                     * tiver metadata de avatar no LiveKit,
+                     * ainda conseguimos mostrar a foto.
+                     */
+                    const storedUser =
+                      getUserById(
+                        participant.identity
+                      )
+
+                    return {
+                      identity:
+                        participant.identity,
+
+                      name:
+                        participant.name ||
+                        storedUser
+                          ?.displayName ||
+                        participant.identity,
+
+                      avatarUrl:
+                        avatarUrl ||
+                        storedUser
+                          ?.avatarUrl ||
+                        ''
+                    }
+                  }
+                )
+            } catch (
+              error
+            ) {
+              /*
+               * Se a sala ainda não existe ou está vazia,
+               * para o Concord isso simplesmente significa
+               * que não existe ninguém nesse canal.
+               */
+              app.log.debug(
+                {
+                  roomName,
+
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : String(
+                          error
+                        )
+                },
+
+                'Concord: sala de voz sem presença disponível.'
+              )
+
+              presence[
+                channel.id
+              ] =
+                []
+            }
+          }
+        )
+      )
+
+      return {
+        presence
+      }
+    }
+  )
+
 
   // ====================================================
   // SERVIDOR DETALHADO

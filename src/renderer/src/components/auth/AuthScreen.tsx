@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import type { AuthMode } from '../../types/concord'
 import { Field } from '../common/Field'
 import { Logo } from '../common/Logo'
+import { Mascot } from '../common/Mascot'
 
 interface AuthScreenProps {
   authMode: AuthMode
@@ -50,10 +51,7 @@ export function AuthScreen({
       <main className="auth-main">
         <section className="auth-card">
           <div className="auth-mascot">
-            <img
-              src="./concord-mascot.png"
-              alt="Concord"
-            />
+            <Mascot alt="Concord" />
           </div>
 
           <h1>
