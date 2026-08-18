@@ -78,6 +78,27 @@ export function VoiceRoom(props: VoiceRoomProps) {
   const [volumeMenu, setVolumeMenu] = useState<VolumeMenu>(null)
   const profile = SCREEN_SHARE_PROFILES.find((item) => item.id === screenQuality)
 
+
+  useEffect(() => {
+    const video = screenVideoRef.current
+    if (!video || !screenTrack) return
+
+    screenTrack.attach(video)
+    video.autoplay = true
+    video.playsInline = true
+    video.muted = true
+
+    void video.play().catch(() => {})
+
+    return () => {
+      try {
+        screenTrack.detach(video)
+      } catch {
+        // A track pode ter sido encerrada enquanto a tela estava fora de foco.
+      }
+    }
+  }, [screenTrack, screenVideoRef])
+
   useEffect(() => {
     const close = () => setVolumeMenu(null)
     window.addEventListener('blur', close)

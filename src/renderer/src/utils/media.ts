@@ -1,64 +1,65 @@
-import type { MessageAttachment } from '../types/concord'
+import { API } from '../config/api'
+import type { AttachmentKind, MessageAttachment } from '../types/concord'
 
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
+
+function detectKind(file: File): AttachmentKind {
+  const lowerName = file.name.toLowerCase()
+
+  if (file.type === 'image/gif' || lowerName.endsWith('.gif')) {
+    return 'sticker'
+  }
+
+  if (file.type.startsWith('image/')) {
+    return 'image'
+  }
+
+  if (file.type.startsWith('video/')) {
+    return 'video'
+  }
+
+  throw new Error('Envie uma imagem, GIF ou vídeo.')
+}
 
 export async function fileToAttachment(file: File): Promise<MessageAttachment> {
   if (file.size > MAX_ATTACHMENT_BYTES) {
     throw new Error('O arquivo deve ter no máximo 100 MB.')
   }
 
-  const isGif =
-    file.type === 'image/gif' ||
-    file.name.toLowerCase().endsWith('.gif')
+  const kind = detectKind(file)
+  const token = localStorage.getItem('concord_token')
 
-  const isImage =
-    file.type.startsWith('image/')
+  const headers = new Headers({
+    'Content-Type': 'application/octet-stream',
+    'X-Concord-File-Name': encodeURIComponent(file.name),
+    'X-Concord-File-Type': file.type || 'application/octet-stream',
+    'X-Concord-File-Kind': kind
+  })
 
-  const isVideo =
-    file.type.startsWith('video/')
-
-  if (!isImage && !isVideo) {
-    throw new Error(
-      'Envie uma imagem, GIF ou vídeo.'
-    )
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
   }
 
-  const dataUrl =
-    await new Promise<string>(
-      (resolve, reject) => {
-        const reader =
-          new FileReader()
+  const response = await fetch(`${API}/uploads`, {
+    method: 'POST',
+    headers,
+    body: file
+  })
 
-        reader.onload = () =>
-          resolve(
-            String(
-              reader.result || ''
-            )
-          )
+  const raw = await response.text()
+  let data: any = {}
 
-        reader.onerror = () =>
-          reject(
-            new Error(
-              'Não foi possível ler o arquivo.'
-            )
-          )
-
-        reader.readAsDataURL(
-          file
-        )
-      }
-    )
-
-  return {
-    kind:
-      isGif
-        ? 'sticker'
-        : isVideo
-          ? 'video'
-          : 'image',
-
-    dataUrl,
-    name: file.name,
-    mimeType: file.type
+  if (raw) {
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      throw new Error('O servidor retornou uma resposta inválida durante o upload.')
+    }
   }
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Não foi possível enviar o arquivo.')
+  }
+
+  return data.attachment as MessageAttachment
 }

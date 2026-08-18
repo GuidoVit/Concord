@@ -69,9 +69,11 @@ export type AttachmentKind = 'image' | 'video' | 'sticker'
 
 export interface MessageAttachment {
   kind: AttachmentKind
-  dataUrl: string
+  dataUrl?: string
+  url?: string
   name?: string
   mimeType?: string
+  size?: number
 }
 
 export interface DirectMessage {

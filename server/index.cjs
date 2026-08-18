@@ -9,6 +9,12 @@ const app = Fastify({
   bodyLimit: 150 * 1024 * 1024
 })
 
+app.addContentTypeParser(
+  'application/octet-stream',
+  { parseAs: 'buffer' },
+  (_request, body, done) => done(null, body)
+)
+
 const cors = require('@fastify/cors')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
@@ -51,6 +57,11 @@ const DATA_DIRECTORY =
     __dirname,
     'data'
   )
+
+const UPLOADS_DIRECTORY = path.join(
+  DATA_DIRECTORY,
+  'uploads'
+)
 
 const USERS_FILE = path.join(
   DATA_DIRECTORY,
@@ -109,6 +120,10 @@ function ensureFile(
 }
 
 function ensureDatabase() {
+  if (!fs.existsSync(UPLOADS_DIRECTORY)) {
+    fs.mkdirSync(UPLOADS_DIRECTORY, { recursive: true })
+  }
+
   ensureFile(
     USERS_FILE,
     []
@@ -201,71 +216,35 @@ function readServerReadState() {
 }
 
 function normalizeAttachment(attachment) {
-  if (
-    !attachment ||
-    typeof attachment !== 'object'
-  ) {
+  if (!attachment || typeof attachment !== 'object') {
     return null
   }
 
-  const kind =
-    String(
-      attachment.kind || ''
-    )
+  const kind = String(attachment.kind || '')
+  const dataUrl = String(attachment.dataUrl || '')
+  const url = String(attachment.url || '')
 
-  const dataUrl =
-    String(
-      attachment.dataUrl || ''
-    )
-
-  if (
-    ![
-      'image',
-      'video',
-      'sticker'
-    ].includes(kind)
-  ) {
+  if (!['image', 'video', 'sticker'].includes(kind)) {
     return null
   }
 
-  if (
-    !dataUrl.startsWith(
-      'data:'
-    )
-  ) {
+  const hasLegacyData = dataUrl.startsWith('data:')
+  const hasUploadedFile = /^\/uploads\/[a-zA-Z0-9._-]+$/.test(url)
+
+  if (!hasLegacyData && !hasUploadedFile) {
     return null
   }
 
-  // Arquivos de até 100 MB ficam em torno
-  // de 133 MB depois da conversão Base64.
-  if (
-    dataUrl.length >
-    140_000_000
-  ) {
+  if (hasLegacyData && dataUrl.length > 140_000_000) {
     return null
   }
 
   return {
     kind,
-    dataUrl,
-
-    name:
-      String(
-        attachment.name ||
-        ''
-      ).slice(
-        0,
-        160
-      ),
-
-    mimeType:
-      String(
-        attachment.mimeType ||
-        ''
-      ).slice(
-        0,
-        120
-      )
+    ...(hasUploadedFile ? { url } : { dataUrl }),
+    name: String(attachment.name || '').slice(0, 160),
+    mimeType: String(attachment.mimeType || '').slice(0, 120),
+    size: Number.isFinite(Number(attachment.size)) ? Number(attachment.size) : undefined
   }
 }
 
@@ -477,7 +456,10 @@ async function start() {
 
       allowedHeaders: [
         'Content-Type',
-        'Authorization'
+        'Authorization',
+        'X-Concord-File-Name',
+        'X-Concord-File-Type',
+        'X-Concord-File-Kind'
       ]
     }
   )
@@ -494,6 +476,137 @@ async function start() {
       ok: true,
       app: 'Concord API'
     })
+  )
+
+  // ====================================================
+  // UPLOADS DE MÍDIA
+  // ====================================================
+
+  app.post(
+    '/uploads',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const body = request.body
+
+      if (!Buffer.isBuffer(body) || body.length === 0) {
+        return reply.code(400).send({ error: 'Arquivo vazio.' })
+      }
+
+      if (body.length > 100 * 1024 * 1024) {
+        return reply.code(413).send({ error: 'O arquivo deve ter no máximo 100 MB.' })
+      }
+
+      let originalName = 'arquivo'
+      try {
+        originalName = decodeURIComponent(String(request.headers['x-concord-file-name'] || 'arquivo'))
+      } catch {
+        originalName = 'arquivo'
+      }
+
+      const mimeType = String(request.headers['x-concord-file-type'] || 'application/octet-stream').slice(0, 120)
+      const kind = String(request.headers['x-concord-file-kind'] || '')
+
+      if (!['image', 'video', 'sticker'].includes(kind)) {
+        return reply.code(400).send({ error: 'Tipo de anexo inválido.' })
+      }
+
+      if (kind === 'video' && !mimeType.startsWith('video/')) {
+        return reply.code(400).send({ error: 'Formato de vídeo inválido.' })
+      }
+
+      if ((kind === 'image' || kind === 'sticker') && !mimeType.startsWith('image/')) {
+        return reply.code(400).send({ error: 'Formato de imagem inválido.' })
+      }
+
+      const safeExtension = path.extname(originalName).toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 12)
+      const fileId = `${crypto.randomUUID()}${safeExtension}`
+      const filePath = path.join(UPLOADS_DIRECTORY, fileId)
+      const metaPath = `${filePath}.json`
+
+      fs.writeFileSync(filePath, body)
+      fs.writeFileSync(
+        metaPath,
+        JSON.stringify({
+          name: originalName.slice(0, 160),
+          mimeType,
+          kind,
+          size: body.length,
+          uploadedBy: request.user.id,
+          createdAt: new Date().toISOString()
+        }, null, 2),
+        'utf8'
+      )
+
+      return reply.code(201).send({
+        attachment: {
+          kind,
+          url: `/uploads/${fileId}`,
+          name: originalName.slice(0, 160),
+          mimeType,
+          size: body.length
+        }
+      })
+    }
+  )
+
+  app.get(
+    '/uploads/:fileId',
+    async (request, reply) => {
+      const fileId = String(request.params.fileId || '')
+
+      if (!/^[a-f0-9-]{36}(?:\.[a-z0-9]{1,10})?$/i.test(fileId)) {
+        return reply.code(404).send({ error: 'Arquivo não encontrado.' })
+      }
+
+      const filePath = path.join(UPLOADS_DIRECTORY, fileId)
+      const metaPath = `${filePath}.json`
+
+      if (!fs.existsSync(filePath) || !fs.existsSync(metaPath)) {
+        return reply.code(404).send({ error: 'Arquivo não encontrado.' })
+      }
+
+      let meta = {}
+      try {
+        meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'))
+      } catch {
+        meta = {}
+      }
+
+      const stat = fs.statSync(filePath)
+      const total = stat.size
+      const mimeType = String(meta.mimeType || 'application/octet-stream')
+      const range = request.headers.range
+
+      reply.header('Accept-Ranges', 'bytes')
+      reply.header('Content-Type', mimeType)
+      reply.header('Cache-Control', 'public, max-age=31536000, immutable')
+
+      if (!range) {
+        reply.header('Content-Length', total)
+        return reply.send(fs.createReadStream(filePath))
+      }
+
+      const match = /^bytes=(\d*)-(\d*)$/.exec(String(range))
+      if (!match) {
+        reply.header('Content-Range', `bytes */${total}`)
+        return reply.code(416).send()
+      }
+
+      const start = match[1] ? Number(match[1]) : 0
+      const requestedEnd = match[2] ? Number(match[2]) : total - 1
+      const end = Math.min(requestedEnd, total - 1)
+
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start > end || start >= total) {
+        reply.header('Content-Range', `bytes */${total}`)
+        return reply.code(416).send()
+      }
+
+      reply.code(206)
+      reply.header('Content-Range', `bytes ${start}-${end}/${total}`)
+      reply.header('Content-Length', end - start + 1)
+
+      return reply.send(fs.createReadStream(filePath, { start, end }))
+    }
   )
 
   // ====================================================

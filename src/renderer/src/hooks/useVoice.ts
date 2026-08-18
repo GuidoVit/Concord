@@ -67,10 +67,16 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
   const remoteAudioContextRef = useRef<AudioContext | null>(null)
   const remoteMasterRef = useRef<GainNode | null>(null)
   const remotePipelinesRef = useRef<Map<string, RemoteAudioPipeline>>(new Map())
+  const remoteTracksRef = useRef<Map<string, RemoteAudioTrack>>(new Map())
+  const deafenedRef = useRef(false)
 
   useEffect(() => {
     mutedRef.current = muted
   }, [muted])
+
+  useEffect(() => {
+    deafenedRef.current = deafened
+  }, [deafened])
 
   const syncVoiceParticipants = useCallback(
     (room: Room) => {
@@ -257,6 +263,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       try { pipeline.trim.disconnect() } catch {}
     })
     remotePipelinesRef.current.clear()
+    remoteTracksRef.current.clear()
 
     try { remoteMasterRef.current?.disconnect() } catch {}
     remoteMasterRef.current = null
@@ -275,13 +282,48 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       source: Track.Source,
       volume: number
     ) => {
+      const key = pipelineKey(identity, source)
+      const safeVolume = clampVolume(volume)
+
+      remoteTracksRef.current.set(key, track)
       removeRemotePipeline(identity, source)
+
+      // LiveKit recomenda anexar faixas de áudio a um elemento de mídia. Mantemos
+      // esse caminho como reprodução principal até 100%, pois é o mais confiável
+      // com autoplay/WebRTC no Electron.
+      document
+        .querySelectorAll<HTMLAudioElement>(
+          `audio[data-concord-identity="${CSS.escape(identity)}"][data-concord-source="${source}"]`
+        )
+        .forEach((element) => element.remove())
+
+      const element = track.attach()
+      element.autoplay = true
+      element.preload = 'auto'
+      element.volume = Math.min(1, safeVolume)
+      element.muted = deafenedRef.current
+      element.setAttribute('data-concord-audio', 'true')
+      element.setAttribute('data-concord-identity', identity)
+      element.setAttribute('data-concord-source', source)
+      element.style.display = 'none'
+      document.body.appendChild(element)
+      void element.play().catch(() => {})
+
+      // Até 100% não há motivo para passar por WebAudio.
+      if (safeVolume <= 1) return
 
       try {
         const context = await getRemoteAudioContext()
         const master = remoteMasterRef.current
         const mediaTrack = track.mediaStreamTrack
-        if (!master || !mediaTrack) throw new Error('Faixa de áudio indisponível.')
+
+        // Se o Chromium não liberou o AudioContext, mantemos o elemento HTML em
+        // 100% em vez de deixar a call completamente silenciosa.
+        if (!master || !mediaTrack || context.state !== 'running') {
+          element.volume = 1
+          element.muted = deafenedRef.current
+          return
+        }
 
         const mediaStream = new MediaStream([mediaTrack])
         const sourceNode = context.createMediaStreamSource(mediaStream)
@@ -289,23 +331,23 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
         const compressor = context.createDynamicsCompressor()
         const trim = context.createGain()
 
-        // Ganho local de 0% a 250%.
-        gain.gain.value = clampVolume(volume)
-
-        // Compressor/limiter suave: protege picos ao elevar vozes baixas sem esmagar o áudio normal.
-        compressor.threshold.value = -8
-        compressor.knee.value = 16
-        compressor.ratio.value = 12
+        gain.gain.value = safeVolume
+        compressor.threshold.value = -10
+        compressor.knee.value = 18
+        compressor.ratio.value = 10
         compressor.attack.value = 0.003
-        compressor.release.value = 0.22
-        trim.gain.value = 0.94
+        compressor.release.value = 0.2
+        trim.gain.value = 0.92
 
         sourceNode.connect(gain)
         gain.connect(compressor)
         compressor.connect(trim)
         trim.connect(master)
 
-        remotePipelinesRef.current.set(pipelineKey(identity, source), {
+        // Evita áudio duplicado: acima de 100% o WebAudio passa a ser a saída.
+        element.muted = true
+
+        remotePipelinesRef.current.set(key, {
           source: sourceNode,
           gain,
           compressor,
@@ -314,42 +356,57 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
           trackSource: source
         })
       } catch (error) {
-        // Fallback seguro caso WebAudio não esteja disponível.
-        console.warn('Concord: fallback de áudio HTML:', error)
-        const element = track.attach()
-        element.autoplay = true
-        element.volume = Math.min(1, clampVolume(volume))
-        element.muted = deafened
-        element.setAttribute('data-concord-audio', 'true')
-        element.setAttribute('data-concord-identity', identity)
-        element.setAttribute('data-concord-source', source)
-        document.body.appendChild(element)
-        void element.play().catch(() => {})
+        console.warn('Concord: não foi possível ativar boost de áudio:', error)
+        element.volume = 1
+        element.muted = deafenedRef.current
       }
     },
-    [deafened, getRemoteAudioContext, pipelineKey, removeRemotePipeline]
+    [getRemoteAudioContext, pipelineKey, removeRemotePipeline]
   )
 
   const applyAudioVolume = useCallback(
     (identity: string, source: Track.Source, volume: number) => {
       const safe = clampVolume(volume)
-      const pipeline = remotePipelinesRef.current.get(pipelineKey(identity, source))
+      const key = pipelineKey(identity, source)
+      const pipeline = remotePipelinesRef.current.get(key)
+      const track = remoteTracksRef.current.get(key)
+      const elements = Array.from(
+        document.querySelectorAll<HTMLAudioElement>(
+          `audio[data-concord-identity="${CSS.escape(identity)}"][data-concord-source="${source}"]`
+        )
+      )
+
+      if (safe <= 1) {
+        if (pipeline) removeRemotePipeline(identity, source)
+        elements.forEach((element) => {
+          element.muted = deafenedRef.current
+          element.volume = safe
+          void element.play().catch(() => {})
+        })
+        return
+      }
 
       if (pipeline) {
         const now = pipeline.gain.context.currentTime
         pipeline.gain.gain.cancelScheduledValues(now)
         pipeline.gain.gain.setTargetAtTime(safe, now, 0.015)
+        elements.forEach((element) => {
+          element.muted = true
+        })
+        return
       }
 
-      document
-        .querySelectorAll<HTMLAudioElement>(
-          `audio[data-concord-identity="${CSS.escape(identity)}"][data-concord-source="${source}"]`
-        )
-        .forEach((element) => {
-          element.volume = Math.min(1, safe)
+      // O usuário acabou de passar de 100%: cria a cadeia de boost sob demanda.
+      if (track) {
+        void createRemotePipeline(track, identity, source, safe)
+      } else {
+        elements.forEach((element) => {
+          element.volume = 1
+          element.muted = deafenedRef.current
         })
+      }
     },
-    [pipelineKey]
+    [createRemotePipeline, pipelineKey, removeRemotePipeline]
   )
 
   const setParticipantVolume = useCallback(
@@ -405,6 +462,10 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       try {
         setVoiceConnecting(true)
 
+        // A entrada na call nasce de um clique. Aproveitamos esse gesto para
+        // liberar o AudioContext antes de qualquer await de rede.
+        void getRemoteAudioContext()
+
         const voiceChannel = (server.channels ?? []).find(
           (channel) => channel.type === 'voice' && (!channelId || channel.id === channelId)
         )
@@ -439,6 +500,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
         room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
           if (!(track instanceof RemoteAudioTrack)) return
           removeRemotePipeline(participant.identity, publication.source)
+          remoteTracksRef.current.delete(pipelineKey(participant.identity, publication.source))
           track.detach().forEach((element) => element.remove())
         })
 
@@ -457,6 +519,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
         })
 
         await room.connect(data.url, data.token)
+        await room.startAudio().catch(() => {})
         await room.localParticipant.setMicrophoneEnabled(true)
 
         setLivekitRoom(room)
@@ -480,7 +543,9 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       apiRequest,
       clearRemoteAudio,
       createRemotePipeline,
+      getRemoteAudioContext,
       participantVolumes,
+      pipelineKey,
       removeRemotePipeline,
       screenShareVolumes,
       startLocalVoiceMeter,
@@ -512,6 +577,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
   const toggleDeafen = useCallback(() => {
     const newValue = !deafened
     setDeafened(newValue)
+    deafenedRef.current = newValue
     playCallSound(newValue ? 'deafen' : 'undeafen')
 
     const master = remoteMasterRef.current
@@ -521,10 +587,14 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       master.gain.setTargetAtTime(newValue ? 0 : 1, now, 0.012)
     }
 
-    document.querySelectorAll('audio[data-concord-audio="true"]').forEach((element) => {
-      ;(element as HTMLAudioElement).muted = newValue
+    document.querySelectorAll<HTMLAudioElement>('audio[data-concord-audio="true"]').forEach((element) => {
+      const identity = element.getAttribute('data-concord-identity') || ''
+      const source = (element.getAttribute('data-concord-source') || '') as Track.Source
+      const boosted = remotePipelinesRef.current.has(pipelineKey(identity, source))
+      element.muted = newValue || boosted
+      if (!newValue && !boosted) void element.play().catch(() => {})
     })
-  }, [deafened])
+  }, [deafened, pipelineKey])
 
   return {
     muted,

@@ -66,8 +66,6 @@ function App() {
   const {
     friends,
     requests,
-    friendUsername,
-    setFriendUsername,
     loadFriends,
     sendFriendRequest,
     acceptFriend,
@@ -377,12 +375,6 @@ function App() {
             }
             requests={
               requests
-            }
-            friendUsername={
-              friendUsername
-            }
-            setFriendUsername={
-              setFriendUsername
             }
             sendFriendRequest={
               sendFriendRequest

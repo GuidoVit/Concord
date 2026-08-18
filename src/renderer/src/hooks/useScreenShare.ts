@@ -23,13 +23,6 @@ export function useScreenShare({ livekitRoom, voiceConnected, user }: UseScreenS
   const screenVideoRef = useRef<HTMLVideoElement | null>(null)
 
   useEffect(() => {
-    const video = screenVideoRef.current
-    if (!video || !screenTrack) return
-    screenTrack.attach(video); video.autoplay = true; video.playsInline = true; video.muted = true
-    return () => { screenTrack.detach(video) }
-  }, [screenTrack])
-
-  useEffect(() => {
     if (!livekitRoom) { setScreenSharing(false); setScreenTrack(null); setScreenSharerName(''); setScreenSharerIdentity(''); return }
     const subscribed = (track: any, publication: any, participant: any) => {
       if (track instanceof RemoteVideoTrack && publication.source === Track.Source.ScreenShare) {

@@ -6,8 +6,6 @@ import { FriendCard } from './FriendCard'
 export function Friends({
   friends,
   requests,
-  friendUsername,
-  setFriendUsername,
   sendFriendRequest,
   acceptFriend,
   declineFriend,
@@ -15,15 +13,15 @@ export function Friends({
 }: {
   friends: User[]
   requests: FriendRequest[]
-  friendUsername: string
-  setFriendUsername: (value: string) => void
-  sendFriendRequest: () => Promise<void> | void
+  sendFriendRequest: (username: string) => Promise<void> | void
   acceptFriend: (id: string) => Promise<void> | void
   declineFriend: (id: string) => Promise<void> | void
   openDirectMessage: (friend: User) => void
 }) {
   const [processingId, setProcessingId] = useState('')
   const [sending, setSending] = useState(false)
+  const [friendUsername, setFriendUsername] = useState('')
+  const [status, setStatus] = useState('')
 
   async function runRequestAction(id: string, action: (id: string) => Promise<void> | void) {
     try {
@@ -37,11 +35,20 @@ export function Friends({
   }
 
   async function submitFriendRequest() {
+    const username = friendUsername.trim().replace(/^@+/, '')
+    if (!username || sending) return
+
     try {
       setSending(true)
-      await sendFriendRequest()
+      setStatus('')
+      await sendFriendRequest(username)
+      setFriendUsername('')
+      setStatus('Pedido enviado!')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Erro ao enviar pedido.')
     } finally {
       setSending(false)
+      window.setTimeout(() => setStatus(''), 2500)
     }
   }
 
@@ -56,6 +63,7 @@ export function Friends({
         <div>
           <strong>Adicionar amigo</strong>
           <span>Use o @username exato.</span>
+          {status && <span>{status}</span>}
         </div>
 
         <div className="friend-input">
@@ -64,8 +72,13 @@ export function Friends({
             value={friendUsername}
             onChange={(event) => setFriendUsername(event.target.value)}
             placeholder="username"
+            autoComplete="off"
+            spellCheck={false}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') void submitFriendRequest()
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                void submitFriendRequest()
+              }
             }}
           />
           <button

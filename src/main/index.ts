@@ -18,6 +18,10 @@ import { registerUpdaterHandlers, scheduleUpdateChecks } from './updater'
 
 let selectedScreenSourceId: string | null = null
 
+// O Concord é um cliente de voz desktop: áudio remoto deve poder tocar sem
+// depender das regras de autoplay de uma aba comum do Chromium.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+
 function registerScreenShareHandlers(): void {
   ipcMain.handle('concord:get-screen-sources', async () => {
     const sources = await desktopCapturer.getSources({

@@ -1,17 +1,29 @@
+import { API } from '../../config/api'
 import type { MessageAttachment } from '../../types/concord'
+
+function attachmentSource(attachment: MessageAttachment): string {
+  if (attachment.url) {
+    return attachment.url.startsWith('/') ? `${API}${attachment.url}` : attachment.url
+  }
+
+  return attachment.dataUrl || ''
+}
 
 export function MessageAttachmentView({
   attachment
 }: {
   attachment?: MessageAttachment | null
 }) {
-  if (!attachment?.dataUrl) return null
+  if (!attachment) return null
+
+  const src = attachmentSource(attachment)
+  if (!src) return null
 
   if (attachment.kind === 'video') {
     return (
       <video
         className="message-media message-video"
-        src={attachment.dataUrl}
+        src={src}
         controls
         playsInline
         preload="metadata"
@@ -22,8 +34,9 @@ export function MessageAttachmentView({
   return (
     <img
       className={attachment.kind === 'sticker' ? 'message-media message-sticker' : 'message-media message-image'}
-      src={attachment.dataUrl}
+      src={src}
       alt={attachment.name || (attachment.kind === 'sticker' ? 'GIF' : 'Imagem')}
+      loading="lazy"
     />
   )
 }
