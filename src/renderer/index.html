@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data:;
+        connect-src
+          'self'
+          http://127.0.0.1:3333
+          http://localhost:3333
+          http://127.0.0.1:5173
+          http://localhost:5173
+          ws://127.0.0.1:7880
+          ws://localhost:7880
+          https://study-statutory-publication-program.trycloudflare.com
+          https://*.livekit.cloud
+          wss://*.livekit.cloud;
+      "
+    />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+
+    <title>Concord</title>
+  </head>
+
+  <body>
+    <div id="root"></div>
+
+    <script
+      type="module"
+      src="/src/main.tsx"
+    ></script>
+  </body>
+</html>

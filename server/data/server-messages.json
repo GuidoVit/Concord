@@ -1,0 +1,26 @@
+[
+  {
+    "id": "65e9fbc8-ce18-471d-853f-4c4e2c138558",
+    "serverId": "5713b93b-4fe2-4f20-b31d-451f5075a447",
+    "channelId": "69490eba-b9ff-44ec-b4b8-4f45368540fc",
+    "authorId": "83a646a2-6f25-447e-b336-655ebe6fcdfb",
+    "content": "bleeehhhh",
+    "createdAt": "2026-08-18T01:38:56.811Z"
+  },
+  {
+    "id": "b716bcf7-6c86-4202-a0bd-1afb6b4d7185",
+    "serverId": "5713b93b-4fe2-4f20-b31d-451f5075a447",
+    "channelId": "69490eba-b9ff-44ec-b4b8-4f45368540fc",
+    "authorId": "9dfb6ef1-3efc-4bb1-ba95-d79b0a66cf42",
+    "content": "bem gae",
+    "createdAt": "2026-08-18T03:54:39.435Z"
+  },
+  {
+    "id": "35012160-3de6-4f6e-bfd4-e9fa0f6123cd",
+    "serverId": "5713b93b-4fe2-4f20-b31d-451f5075a447",
+    "channelId": "69490eba-b9ff-44ec-b4b8-4f45368540fc",
+    "authorId": "9dfb6ef1-3efc-4bb1-ba95-d79b0a66cf42",
+    "content": "bem gay",
+    "createdAt": "2026-08-18T03:56:58.489Z"
+  }
+]
