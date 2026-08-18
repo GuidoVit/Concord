@@ -1,2 +1,2 @@
 export const API =
-  'https://developed-visits-fix-holders.trycloudflare.com'
+  'https://concord-production-ec89.up.railway.app'
