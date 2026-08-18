@@ -1,0 +1,632 @@
+/* =====================================================
+   CONCORD - SOCIAL / DIRECT MESSAGES
+===================================================== */
+
+/* -----------------------------------------------------
+   SERVIDOR EM TELA LIMPA
+
+   Quando estamos dentro de um servidor a sidebar
+   social não existe no DOM. A main ocupa todo o espaço
+   restante entre o server rail e a janela.
+----------------------------------------------------- */
+
+.shell.server-mode .main {
+  min-width: 0;
+  flex: 1;
+}
+
+
+/* -----------------------------------------------------
+   BOTÃO HOME / MASCOTE
+----------------------------------------------------- */
+
+.concord-home-button {
+  position: relative;
+
+  overflow: visible !important;
+}
+
+
+/* -----------------------------------------------------
+   BADGE GLOBAL DE MENSAGENS
+
+   Aparece no canto do mascote mesmo enquanto estamos
+   dentro de um servidor.
+----------------------------------------------------- */
+
+.concord-unread-badge {
+  position: absolute;
+
+  right: -5px;
+  bottom: -4px;
+
+  z-index: 20;
+
+  min-width: 19px;
+  height: 19px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 5px;
+
+  border:
+    3px solid
+    #080b0e;
+
+  border-radius: 999px;
+
+  color: #07110d;
+
+  background:
+    var(--mint);
+
+  box-shadow:
+    0 3px 13px
+    rgba(
+      39,
+      224,
+      179,
+      0.28
+    );
+
+  font-size: 8px;
+
+  font-weight: 950;
+
+  line-height: 1;
+}
+
+
+/* -----------------------------------------------------
+   LISTA DE MENSAGENS DIRETAS
+----------------------------------------------------- */
+
+.dm-sidebar-list {
+  min-height: 0;
+
+  flex: 1;
+
+  padding: 0 8px 10px;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.dm-sidebar-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.dm-sidebar-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+
+  background: #28312d;
+}
+
+
+/* -----------------------------------------------------
+   CONVERSA NA SIDEBAR
+----------------------------------------------------- */
+
+.dm-sidebar-item {
+  width: 100%;
+
+  min-height: 52px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 9px;
+
+  margin-bottom: 3px;
+
+  padding: 6px 8px;
+
+  border: none;
+
+  border-radius: 9px;
+
+  color: #9da7a1;
+
+  background: transparent;
+
+  text-align: left;
+
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.dm-sidebar-item:hover {
+  color: #e6ebe8;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.035
+    );
+}
+
+.dm-sidebar-item.active {
+  color: var(--white);
+
+  background:
+    var(--panel-2);
+}
+
+.dm-sidebar-item .avatar {
+  width: 32px;
+  height: 32px;
+
+  flex-shrink: 0;
+
+  font-size: 11px;
+}
+
+.dm-sidebar-info {
+  min-width: 0;
+
+  flex: 1;
+}
+
+.dm-sidebar-info strong,
+.dm-sidebar-info small {
+  display: block;
+
+  overflow: hidden;
+
+  white-space: nowrap;
+
+  text-overflow: ellipsis;
+}
+
+.dm-sidebar-info strong {
+  color: inherit;
+
+  font-size: 9px;
+}
+
+.dm-sidebar-info small {
+  margin-top: 3px;
+
+  color: var(--dim);
+
+  font-size: 7px;
+}
+
+
+/* -----------------------------------------------------
+   BADGE DE UMA CONVERSA
+----------------------------------------------------- */
+
+.dm-unread {
+  min-width: 17px;
+  height: 17px;
+
+  flex-shrink: 0;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 4px;
+
+  border-radius: 999px;
+
+  color: #07110d;
+
+  background:
+    var(--mint);
+
+  font-size: 7px;
+
+  font-weight: 950;
+}
+
+
+/* =====================================================
+   TELA DE DM
+===================================================== */
+
+.dm-page {
+  width: 100%;
+  height: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  background:
+    #090c0f;
+}
+
+
+/* -----------------------------------------------------
+   HEADER
+----------------------------------------------------- */
+
+.dm-header {
+  height: 66px;
+
+  flex-shrink: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  padding: 0 20px;
+
+  border-bottom:
+    1px solid
+    var(--border-soft);
+
+  background:
+    rgba(
+      11,
+      15,
+      18,
+      0.96
+    );
+}
+
+.dm-header .avatar {
+  width: 34px;
+  height: 34px;
+
+  font-size: 11px;
+}
+
+.dm-header strong,
+.dm-header span {
+  display: block;
+}
+
+.dm-header strong {
+  color: var(--white);
+
+  font-size: 11px;
+}
+
+.dm-header span {
+  margin-top: 2px;
+
+  color: var(--muted);
+
+  font-size: 8px;
+}
+
+
+/* -----------------------------------------------------
+   ÁREA DAS MENSAGENS
+----------------------------------------------------- */
+
+.dm-messages {
+  min-height: 0;
+
+  flex: 1;
+
+  padding:
+    24px
+    max(
+      24px,
+      calc(
+        (100% - 900px) /
+        2
+      )
+    );
+
+  overflow-y: auto;
+
+  scroll-behavior: smooth;
+}
+
+.dm-messages::-webkit-scrollbar {
+  width: 7px;
+}
+
+.dm-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dm-messages::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+
+  background:
+    #242c29;
+}
+
+
+/* -----------------------------------------------------
+   INÍCIO DA CONVERSA
+----------------------------------------------------- */
+
+.dm-start {
+  margin:
+    50px 0
+    32px;
+}
+
+.dm-start .avatar {
+  width: 64px;
+  height: 64px;
+
+  margin-bottom: 14px;
+
+  font-size: 20px;
+}
+
+.dm-start h2 {
+  margin: 0;
+
+  color: var(--white);
+
+  font-size: 22px;
+}
+
+.dm-start p {
+  margin:
+    6px 0 0;
+
+  color: var(--muted);
+
+  font-size: 10px;
+}
+
+
+/* -----------------------------------------------------
+   MENSAGEM
+----------------------------------------------------- */
+
+.dm-message {
+  width: 100%;
+
+  display: flex;
+
+  align-items: flex-start;
+
+  gap: 11px;
+
+  padding:
+    6px 8px;
+
+  border-radius: 8px;
+
+  transition:
+    background 0.1s ease;
+}
+
+.dm-message:hover {
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.018
+    );
+}
+
+.dm-message.grouped {
+  padding-left: 51px;
+
+  margin-top: -3px;
+}
+
+.dm-message .avatar {
+  width: 32px;
+  height: 32px;
+
+  flex-shrink: 0;
+
+  font-size: 10px;
+}
+
+.dm-message-body {
+  min-width: 0;
+
+  flex: 1;
+}
+
+.dm-message-meta {
+  display: flex;
+
+  align-items: baseline;
+
+  gap: 7px;
+
+  margin-bottom: 3px;
+}
+
+.dm-message-meta strong {
+  color: #e3e8e5;
+
+  font-size: 10px;
+}
+
+.dm-message.mine
+.dm-message-meta strong {
+  color:
+    var(--mint);
+}
+
+.dm-message-meta span {
+  color: var(--dim);
+
+  font-size: 7px;
+}
+
+.dm-message-body p {
+  margin: 0;
+
+  color: #bdc6c1;
+
+  font-size: 10px;
+
+  line-height: 1.55;
+
+  white-space: pre-wrap;
+
+  overflow-wrap:
+    anywhere;
+}
+
+
+/* -----------------------------------------------------
+   CAMPO DE DIGITAÇÃO
+----------------------------------------------------- */
+
+.dm-composer {
+  flex-shrink: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  padding:
+    12px
+    max(
+      24px,
+      calc(
+        (100% - 900px) /
+        2
+      )
+    )
+    18px;
+
+  border-top:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.025
+    );
+}
+
+.dm-composer input {
+  min-width: 0;
+
+  flex: 1;
+
+  height: 45px;
+
+  padding: 0 14px;
+
+  border:
+    1px solid
+    var(--border);
+
+  border-radius: 10px;
+
+  outline: none;
+
+  color: var(--white);
+
+  background:
+    #11161a;
+
+  font-size: 10px;
+}
+
+.dm-composer input::placeholder {
+  color: #56605b;
+}
+
+.dm-composer input:focus {
+  border-color:
+    rgba(
+      39,
+      224,
+      179,
+      0.35
+    );
+
+  box-shadow:
+    0 0 0 3px
+    rgba(
+      39,
+      224,
+      179,
+      0.035
+    );
+}
+
+.dm-composer button {
+  height: 45px;
+
+  padding: 0 17px;
+
+  border: none;
+
+  border-radius: 10px;
+
+  color: #07110d;
+
+  background:
+    var(--mint);
+
+  font-size: 9px;
+
+  font-weight: 900;
+}
+
+.dm-composer button:disabled {
+  opacity: 0.35;
+
+  cursor: default;
+}
+
+
+/* =====================================================
+   FRIEND CARD CLICÁVEL
+===================================================== */
+
+button.friend-card {
+  width: 100%;
+
+  color: inherit;
+
+  text-align: left;
+
+  cursor: pointer;
+}
+
+button.friend-card:hover {
+  border-color:
+    rgba(
+      39,
+      224,
+      179,
+      0.2
+    );
+
+  background:
+    var(--panel-2);
+}
+
+
+/* =====================================================
+   SERVER MODE
+===================================================== */
+
+
+/* FASE 4 - mídia nas mensagens diretas */
+.dm-message-body .message-media {
+  margin-top: 7px;
+}
+
+.dm-message.grouped .message-media {
+  margin-top: 3px;
+}

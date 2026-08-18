@@ -1,0 +1,181 @@
+.server-sidebar-title {
+  display: flex;
+
+  align-items: center;
+
+  height: 66px;
+
+  padding: 0 18px;
+
+  overflow: hidden;
+}
+
+.server-sidebar-title strong {
+  width: 100%;
+
+  overflow: hidden;
+
+  color: #f6f7f4;
+
+  font-size: 15px;
+
+  font-weight: 850;
+
+  white-space: nowrap;
+
+  text-overflow: ellipsis;
+}
+/* =========================================
+   SIDEBAR SOCIAL
+========================================= */
+
+.sidebar-friends {
+  flex: 1;
+
+  padding: 0 9px;
+
+  overflow-y: auto;
+}
+
+.sidebar-friends::-webkit-scrollbar {
+  display: none;
+}
+
+.sidebar-friend {
+  width: 100%;
+
+  min-height: 52px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 7px 9px;
+
+  margin-bottom: 4px;
+
+  border: none;
+
+  border-radius: 9px;
+
+  color: #aab3ae;
+
+  background: transparent;
+
+  text-align: left;
+}
+
+.sidebar-friend:hover {
+  background:
+    var(--panel);
+}
+
+.sidebar-friend .avatar {
+  width: 31px;
+  height: 31px;
+
+  font-size: 11px;
+}
+
+.sidebar-friend
+> div:nth-child(2) {
+  min-width: 0;
+
+  flex: 1;
+}
+
+.sidebar-friend strong,
+.sidebar-friend small {
+  display: block;
+
+  overflow: hidden;
+
+  white-space: nowrap;
+
+  text-overflow: ellipsis;
+}
+
+.sidebar-friend strong {
+  color: #cfd5d1;
+
+  font-size: 9px;
+}
+
+.sidebar-friend small {
+  margin-top: 2px;
+
+  color: var(--dim);
+
+  font-size: 7px;
+}
+
+.sidebar-friend .online-dot {
+  width: 7px;
+  height: 7px;
+
+  flex-shrink: 0;
+}
+
+/* =========================================
+   BOTÃO DE COMPARTILHAMENTO
+========================================= */
+
+.voice-button.screen-share {
+  color: #0c1713;
+
+  border-color:
+    rgba(
+      39,
+      224,
+      179,
+      0.55
+    );
+
+  background:
+    linear-gradient(
+      135deg,
+      var(--mint),
+      #76ed9c
+    );
+
+  font-weight: 800;
+}
+
+.voice-button.screen-share:hover {
+  filter:
+    brightness(1.06);
+}
+
+.voice-button.screen-active {
+  color:
+    var(--solar-bright);
+
+  border-color:
+    rgba(
+      246,
+      201,
+      69,
+      0.35
+    );
+
+  background:
+    rgba(
+      246,
+      201,
+      69,
+      0.08
+    );
+}
+
+.voice-button.screen-active:hover {
+  background:
+    rgba(
+      246,
+      201,
+      69,
+      0.14
+    );
+}
+

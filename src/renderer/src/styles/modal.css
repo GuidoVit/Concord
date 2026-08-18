@@ -1,0 +1,170 @@
+/* =========================================
+   MODAL
+========================================= */
+
+.modal-backdrop {
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 50;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  background:
+    rgba(0, 0, 0, 0.72);
+
+  backdrop-filter: blur(8px);
+}
+
+.modal {
+  width: 390px;
+
+  padding: 23px;
+
+  border:
+    1px solid var(--border);
+
+  border-radius: 16px;
+
+  background: #101419;
+
+  box-shadow:
+    0 35px 100px
+    rgba(0, 0, 0, 0.55);
+}
+
+.modal-head {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-head h2 {
+  margin: 0;
+
+  font-size: 18px;
+}
+
+.modal-head button {
+  border: none;
+
+  color: var(--muted);
+
+  background: transparent;
+
+  font-size: 23px;
+}
+
+.modal > p {
+  color: var(--muted);
+
+  font-size: 10px;
+}
+
+.modal-input {
+  width: 100%;
+
+  height: 44px;
+
+  margin:
+    10px 0 12px;
+
+  padding: 0 12px;
+
+  border:
+    1px solid var(--border);
+
+  border-radius: 8px;
+
+  outline: none;
+
+  color: white;
+
+  background: #080b0e;
+}
+
+.modal-input:focus {
+  border-color: var(--solar);
+}
+
+.modal-input.code {
+  text-transform: uppercase;
+
+  letter-spacing: 2px;
+}
+
+.modal .primary {
+  width: 100%;
+}
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (
+  max-width: 900px
+) {
+  .sidebar {
+    width: 205px;
+  }
+
+  .page {
+    padding:
+      32px 28px;
+  }
+
+  .quick-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+  .add-friend {
+    flex-direction: column;
+
+    align-items: stretch;
+  }
+
+  .friend-input {
+    width: 100%;
+  }
+
+  .channels {
+    width: 175px;
+  }
+}
+/* =========================================
+   MASCOTE NA BARRA DE SERVIDORES
+========================================= */
+
+.mascot-rail {
+  padding: 0 !important;
+
+  overflow: hidden;
+
+  border: none !important;
+
+  background: transparent !important;
+
+  box-shadow: none !important;
+}
+
+.rail-mascot-image {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+
+  border-radius: 14px;
+}
+
+/* =========================================
+   NOME DO SERVIDOR NA SIDEBAR
+========================================= */
+

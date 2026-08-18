@@ -1,7 +1,7 @@
 {
   "name": "concord",
-  "version": "1.0.0",
-  "description": "Concord - chat, servidores, chamadas de voz e compartilhamento de tela",
+  "version": "1.1.0",
+  "description": "Concord - chat, servidores, chamadas de voz, compartilhamento de tela e atualizações automáticas",
   "main": "./out/main/index.js",
   "author": "Vitor Kallas",
   "homepage": "https://electron-vite.org",
@@ -19,7 +19,8 @@
     "postinstall": "electron-builder install-app-deps",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux"
+    "build:linux": "npm run build && electron-builder --linux",
+    "release:win": "npm run build && electron-builder --win --publish always"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
@@ -28,6 +29,7 @@
     "bcryptjs": "^3.0.3",
     "concurrently": "^10.0.5",
     "dotenv": "^17.4.2",
+    "electron-updater": "^6.8.9",
     "fastify": "^5.12.0",
     "jsonwebtoken": "^9.0.3",
     "livekit-client": "^2.22.0",

@@ -1,0 +1,218 @@
+:root {
+  --bg: #080a0d;
+  --bg-soft: #0b0e12;
+  --panel: #101419;
+  --panel-2: #151a20;
+  --panel-3: #1a2027;
+
+  --border: #252d36;
+  --border-soft: #1b222a;
+
+  --solar: #f6c945;
+  --solar-bright: #ffdc63;
+  --solar-dark: #c89a18;
+
+  --mint: #27e0b3;
+  --mint-bright: #58f0ca;
+  --mint-dark: #109c7d;
+
+  --white: #f6f7f4;
+  --text: #d7dcd8;
+  --muted: #79837e;
+  --dim: #4e5854;
+
+  --danger: #ff5f66;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  background: var(--bg);
+  color: var(--white);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.app {
+  width: 100vw;
+  height: 100vh;
+}
+
+
+/* =====================================================
+   JANELA FRAMELESS
+===================================================== */
+.window-chrome {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 34px;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.window-drag-region {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(420px, 32vw);
+  height: 18px;
+  transform: translateX(-50%);
+  -webkit-app-region: drag;
+}
+
+/* Elementos interativos nunca devem virar parte da área de arraste. */
+button,
+a,
+input,
+textarea,
+select,
+label,
+[role='button'] {
+  -webkit-app-region: no-drag;
+}
+
+.window-controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 34px;
+  display: flex;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.window-control {
+  width: 46px;
+  height: 34px;
+  border: 0;
+  border-radius: 0;
+  display: grid;
+  place-items: center;
+  color: #b9c2bd;
+  background: rgba(8, 10, 13, .28);
+  transition: background .14s ease, color .14s ease;
+}
+
+.window-control:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, .09);
+}
+
+.window-control.close:hover {
+  background: #d83b45;
+}
+
+.window-minimize {
+  width: 11px;
+  height: 1px;
+  background: currentColor;
+}
+
+.window-maximize {
+  width: 10px;
+  height: 10px;
+  border: 1px solid currentColor;
+}
+
+.window-restore {
+  width: 10px;
+  height: 10px;
+  border: 1px solid currentColor;
+  position: relative;
+}
+
+.window-restore::before {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  left: 2px;
+  top: -4px;
+  z-index: -1;
+}
+
+.window-close {
+  position: relative;
+  width: 11px;
+  height: 11px;
+}
+
+.window-close::before,
+.window-close::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: -1px;
+  width: 1px;
+  height: 13px;
+  background: currentColor;
+}
+
+.window-close::before { transform: rotate(45deg); }
+.window-close::after { transform: rotate(-45deg); }
+
+/* =====================================================
+   AUTO UPDATE
+===================================================== */
+.update-banner {
+  position: fixed;
+  z-index: 9000;
+  right: 16px;
+  top: 44px;
+  width: min(430px, calc(100vw - 32px));
+  min-height: 76px;
+  padding: 13px 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid rgba(246, 201, 69, .28);
+  border-radius: 13px;
+  background: rgba(16, 20, 25, .97);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, .42);
+  backdrop-filter: blur(18px);
+  -webkit-app-region: no-drag;
+}
+
+.update-banner.ready { border-color: rgba(39, 224, 179, .35); }
+.update-banner.error { border-color: rgba(255, 95, 102, .35); }
+.update-banner-copy { min-width: 0; flex: 1; }
+.update-banner-copy strong { display: block; font-size: 12px; }
+.update-banner-copy span { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.update-banner-actions { display: flex; gap: 7px; flex-shrink: 0; }
+.update-banner-actions button { border: 0; border-radius: 8px; padding: 8px 10px; font-size: 9px; font-weight: 800; }
+.update-primary { background: linear-gradient(135deg, var(--solar), var(--mint)); color: #08100d; }
+.update-secondary { background: var(--panel-3); color: var(--muted); }
+.update-progress { height: 5px; overflow: hidden; margin-top: 9px; border-radius: 999px; background: #242b31; }
+.update-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--solar), var(--mint)); transition: width .18s ease; }

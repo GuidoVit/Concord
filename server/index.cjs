@@ -6,7 +6,7 @@ const Fastify = require('fastify')
 
 const app = Fastify({
   logger: true,
-  bodyLimit: 5 * 1024 * 1024
+  bodyLimit: 150 * 1024 * 1024
 })
 
 const cors = require('@fastify/cors')
@@ -18,7 +18,11 @@ const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
 
-const PORT = 3333
+const PORT =
+  Number(
+    process.env.PORT ||
+    3333
+  )
 
 // ======================================================
 // LIVEKIT
@@ -41,10 +45,12 @@ const JWT_SECRET =
 // BANCO JSON
 // ======================================================
 
-const DATA_DIRECTORY = path.join(
-  __dirname,
-  'data'
-)
+const DATA_DIRECTORY =
+  process.env.DATA_DIRECTORY ||
+  path.join(
+    __dirname,
+    'data'
+  )
 
 const USERS_FILE = path.join(
   DATA_DIRECTORY,
@@ -69,6 +75,11 @@ const MESSAGES_FILE = path.join(
 const SERVER_MESSAGES_FILE = path.join(
   DATA_DIRECTORY,
   'server-messages.json'
+)
+
+const SERVER_READ_STATE_FILE = path.join(
+  DATA_DIRECTORY,
+  'server-read-state.json'
 )
 
 function ensureFile(
@@ -120,6 +131,11 @@ function ensureDatabase() {
 
   ensureFile(
     SERVER_MESSAGES_FILE,
+    []
+  )
+
+  ensureFile(
+    SERVER_READ_STATE_FILE,
     []
   )
 }
@@ -178,6 +194,122 @@ function readMessages() {
   )
 }
 
+function readServerReadState() {
+  return readJson(
+    SERVER_READ_STATE_FILE
+  )
+}
+
+function normalizeAttachment(attachment) {
+  if (
+    !attachment ||
+    typeof attachment !== 'object'
+  ) {
+    return null
+  }
+
+  const kind =
+    String(
+      attachment.kind || ''
+    )
+
+  const dataUrl =
+    String(
+      attachment.dataUrl || ''
+    )
+
+  if (
+    ![
+      'image',
+      'video',
+      'sticker'
+    ].includes(kind)
+  ) {
+    return null
+  }
+
+  if (
+    !dataUrl.startsWith(
+      'data:'
+    )
+  ) {
+    return null
+  }
+
+  // Arquivos de até 100 MB ficam em torno
+  // de 133 MB depois da conversão Base64.
+  if (
+    dataUrl.length >
+    140_000_000
+  ) {
+    return null
+  }
+
+  return {
+    kind,
+    dataUrl,
+
+    name:
+      String(
+        attachment.name ||
+        ''
+      ).slice(
+        0,
+        160
+      ),
+
+    mimeType:
+      String(
+        attachment.mimeType ||
+        ''
+      ).slice(
+        0,
+        120
+      )
+  }
+}
+
+function markServerChannelRead(
+  userId,
+  serverId,
+  channelId
+) {
+  const states =
+    readServerReadState()
+
+  const now =
+    new Date()
+      .toISOString()
+
+  const existing =
+    states.find(
+      (item) =>
+        item.userId ===
+          userId &&
+        item.serverId ===
+          serverId &&
+        item.channelId ===
+          channelId
+    )
+
+  if (existing) {
+    existing.lastReadAt =
+      now
+  } else {
+    states.push({
+      userId,
+      serverId,
+      channelId,
+      lastReadAt: now
+    })
+  }
+
+  writeJson(
+    SERVER_READ_STATE_FILE,
+    states
+  )
+}
+
 function normalizeUsername(
   username
 ) {
@@ -195,11 +327,16 @@ function publicUser(user) {
 
   return {
     id: user.id,
-    username: user.username,
+
+    username:
+      user.username,
+
     displayName:
       user.displayName,
+
     createdAt:
       user.createdAt,
+
     avatarUrl:
       user.avatarUrl || ''
   }
@@ -209,12 +346,16 @@ function generateToken(user) {
   return jwt.sign(
     {
       id: user.id,
+
       username:
         user.username
     },
+
     JWT_SECRET,
+
     {
-      expiresIn: '30d'
+      expiresIn:
+        '30d'
     }
   )
 }
@@ -240,7 +381,9 @@ async function authenticate(
     type,
     token
   ] =
-    authorization.split(' ')
+    authorization.split(
+      ' '
+    )
 
   if (
     type !== 'Bearer' ||
@@ -324,7 +467,13 @@ async function start() {
         'http://127.0.0.1:5173'
       ],
 
-      methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
+      methods: [
+        'GET',
+        'POST',
+        'PATCH',
+        'DELETE',
+        'OPTIONS'
+      ],
 
       allowedHeaders: [
         'Content-Type',
@@ -420,7 +569,8 @@ async function start() {
       }
 
       if (
-        password.length < 6
+        password.length <
+        6
       ) {
         return reply
           .code(400)
@@ -573,6 +723,7 @@ async function start() {
       preHandler:
         authenticate
     },
+
     async (
       request,
       reply
@@ -610,6 +761,7 @@ async function start() {
       preHandler:
         authenticate
     },
+
     async (
       request
     ) => {
@@ -638,7 +790,9 @@ async function start() {
       const friends =
         accepted
           .map(
-            (friendship) => {
+            (
+              friendship
+            ) => {
               const friendId =
                 friendship
                   .senderId ===
@@ -703,6 +857,7 @@ async function start() {
       preHandler:
         authenticate
     },
+
     async (
       request,
       reply
@@ -807,6 +962,7 @@ async function start() {
       preHandler:
         authenticate
     },
+
     async (
       request,
       reply
@@ -853,6 +1009,7 @@ async function start() {
       preHandler:
         authenticate
     },
+
     async (
       request,
       reply
@@ -910,17 +1067,48 @@ async function start() {
       preHandler:
         authenticate
     },
+
     async (
       request
     ) => ({
       servers:
         readServers()
-          .filter((server) => (server.members || []).includes(request.user.id))
-          .map((server) => ({
-            ...server,
-            channels: server.channels || [{ id: crypto.randomUUID(), name: 'Geral', type: 'voice' }],
-            memberRoles: server.memberRoles || { [server.ownerId]: 'owner' }
-          }))
+          .filter(
+            (server) =>
+              (
+                server.members ||
+                []
+              ).includes(
+                request.user.id
+              )
+          )
+          .map(
+            (server) => ({
+              ...server,
+
+              channels:
+                server.channels ||
+                [
+                  {
+                    id:
+                      crypto.randomUUID(),
+
+                    name:
+                      'Geral',
+
+                    type:
+                      'voice'
+                  }
+                ],
+
+              memberRoles:
+                server.memberRoles ||
+                {
+                  [server.ownerId]:
+                    'owner'
+                }
+            })
+          )
     })
   )
 
@@ -930,6 +1118,7 @@ async function start() {
       preHandler:
         authenticate
     },
+
     async (
       request,
       reply
@@ -991,11 +1180,25 @@ async function start() {
           request.user.id
         ],
 
-        memberRoles: { [request.user.id]: 'owner' },
+        memberRoles: {
+          [request.user.id]:
+            'owner'
+        },
+
         iconUrl: '',
 
         channels: [
-          { id: crypto.randomUUID(), name: 'geral', type: 'text' },
+          {
+            id:
+              crypto.randomUUID(),
+
+            name:
+              'geral',
+
+            type:
+              'text'
+          },
+
           {
             id:
               crypto.randomUUID(),
@@ -1034,6 +1237,7 @@ async function start() {
       preHandler:
         authenticate
     },
+
     async (
       request,
       reply
@@ -1093,16 +1297,13 @@ async function start() {
   // MENSAGENS DIRETAS
   // ====================================================
 
-  /*
-   * Retorna todas as conversas do usuário
-   * e a quantidade de mensagens não lidas.
-   */
   app.get(
     '/messages',
     {
       preHandler:
         authenticate
     },
+
     async (
       request
     ) => {
@@ -1206,7 +1407,6 @@ async function start() {
                   ),
 
                 lastMessage,
-
                 unread
               }
             }
@@ -1270,15 +1470,13 @@ async function start() {
     }
   )
 
-  /*
-   * Carrega uma conversa.
-   */
   app.get(
     '/messages/:friendId',
     {
       preHandler:
         authenticate
     },
+
     async (
       request,
       reply
@@ -1371,15 +1569,13 @@ async function start() {
     }
   )
 
-  /*
-   * Envia mensagem.
-   */
   app.post(
     '/messages/:friendId',
     {
       preHandler:
         authenticate
     },
+
     async (
       request,
       reply
@@ -1399,6 +1595,12 @@ async function start() {
         )
           .trim()
 
+      const attachment =
+        normalizeAttachment(
+          request.body
+            ?.attachment
+        )
+
       if (
         !areFriends(
           myId,
@@ -1413,12 +1615,15 @@ async function start() {
           })
       }
 
-      if (!content) {
+      if (
+        !content &&
+        !attachment
+      ) {
         return reply
           .code(400)
           .send({
             error:
-              'Digite uma mensagem.'
+              'Digite uma mensagem ou envie um arquivo.'
           })
       }
 
@@ -1462,6 +1667,7 @@ async function start() {
           friendId,
 
         content,
+        attachment,
 
         read: false,
 
@@ -1495,6 +1701,7 @@ async function start() {
       preHandler:
         authenticate
     },
+
     async (
       request,
       reply
@@ -1542,6 +1749,13 @@ async function start() {
             name:
               user.displayName,
 
+            metadata:
+              JSON.stringify({
+                avatarUrl:
+                  user.avatarUrl ||
+                  ''
+              }),
+
             ttl:
               '2h'
           }
@@ -1575,101 +1789,1110 @@ async function start() {
   )
 
   // ====================================================
-  // CONCORD VNEXT - SERVERS, CHANNELS, ROLES & PROFILE
+  // SERVIDOR DETALHADO
   // ====================================================
 
-  app.get('/servers/:serverId', { preHandler: authenticate }, async (request, reply) => {
-    const servers = readServers()
-    const server = servers.find((s) => s.id === request.params.serverId)
-    if (!server || !(server.members || []).includes(request.user.id)) return reply.code(404).send({ error: 'Servidor não encontrado.' })
-    server.channels = server.channels || [{ id: crypto.randomUUID(), name: 'Geral', type: 'voice' }]
-    server.memberRoles = server.memberRoles || { [server.ownerId]: 'owner' }
-    const members = (server.members || []).map((id) => {
-      const member = publicUser(getUserById(id))
-      return member ? { ...member, role: id === server.ownerId ? 'owner' : (server.memberRoles[id] || 'member') } : null
-    }).filter(Boolean)
-    return { server, members }
-  })
+  app.get(
+    '/servers/:serverId',
+    {
+      preHandler:
+        authenticate
+    },
 
-  app.patch('/servers/:serverId', { preHandler: authenticate }, async (request, reply) => {
-    const servers = readServers(); const server = servers.find((s) => s.id === request.params.serverId)
-    if (!server) return reply.code(404).send({ error: 'Servidor não encontrado.' })
-    if (server.ownerId !== request.user.id) return reply.code(403).send({ error: 'Somente o dono pode alterar o servidor.' })
-    const { name, iconUrl } = request.body || {}
-    if (typeof name === 'string' && name.trim().length >= 2) server.name = name.trim().slice(0, 40)
-    if (typeof iconUrl === 'string') server.iconUrl = iconUrl.slice(0, 1500000)
-    writeJson(SERVERS_FILE, servers); return { server }
-  })
+    async (
+      request,
+      reply
+    ) => {
+      const servers =
+        readServers()
 
-  app.delete('/servers/:serverId', { preHandler: authenticate }, async (request, reply) => {
-    const servers = readServers(); const server = servers.find((s) => s.id === request.params.serverId)
-    if (!server) return reply.code(404).send({ error: 'Servidor não encontrado.' })
-    if (server.ownerId !== request.user.id) return reply.code(403).send({ error: 'Somente o dono pode excluir o servidor.' })
-    writeJson(SERVERS_FILE, servers.filter((s) => s.id !== server.id))
-    const all = readJson(SERVER_MESSAGES_FILE); writeJson(SERVER_MESSAGES_FILE, all.filter((m) => m.serverId !== server.id))
-    return { ok: true }
-  })
+      const server =
+        servers.find(
+          (item) =>
+            item.id ===
+            request.params
+              .serverId
+        )
 
-  app.post('/servers/:serverId/channels', { preHandler: authenticate }, async (request, reply) => {
-    const servers = readServers(); const server = servers.find((s) => s.id === request.params.serverId)
-    if (!server) return reply.code(404).send({ error: 'Servidor não encontrado.' })
-    const role = request.user.id === server.ownerId ? 'owner' : (server.memberRoles?.[request.user.id] || 'member')
-    if (!['owner','admin','moderator'].includes(role)) return reply.code(403).send({ error: 'Você não pode criar canais.' })
-    const { name, type } = request.body || {}; if (!name?.trim() || !['voice','text'].includes(type)) return reply.code(400).send({ error: 'Canal inválido.' })
-    server.channels = server.channels || []
-    const channel = { id: crypto.randomUUID(), name: name.trim().slice(0, 30), type }
-    server.channels.push(channel); writeJson(SERVERS_FILE, servers); return { server, channel }
-  })
+      if (
+        !server ||
+        !(
+          server.members ||
+          []
+        ).includes(
+          request.user.id
+        )
+      ) {
+        return reply
+          .code(404)
+          .send({
+            error:
+              'Servidor não encontrado.'
+          })
+      }
 
-  app.delete('/servers/:serverId/channels/:channelId', { preHandler: authenticate }, async (request, reply) => {
-    const servers = readServers(); const server = servers.find((s) => s.id === request.params.serverId)
-    if (!server) return reply.code(404).send({ error: 'Servidor não encontrado.' })
-    const role = request.user.id === server.ownerId ? 'owner' : (server.memberRoles?.[request.user.id] || 'member')
-    if (!['owner','admin','moderator'].includes(role)) return reply.code(403).send({ error: 'Você não pode excluir canais.' })
-    server.channels = server.channels || []
-    const target = server.channels.find((c) => c.id === request.params.channelId)
-    if (target?.type === 'voice' && server.channels.filter((c) => c.type === 'voice').length <= 1) return reply.code(400).send({ error: 'O servidor precisa ter ao menos um canal de voz.' })
-    server.channels = server.channels.filter((c) => c.id !== request.params.channelId)
-    writeJson(SERVERS_FILE, servers)
-    const all = readJson(SERVER_MESSAGES_FILE); writeJson(SERVER_MESSAGES_FILE, all.filter((m) => m.channelId !== request.params.channelId))
-    return { server }
-  })
+      server.channels =
+        server.channels ||
+        [
+          {
+            id:
+              crypto.randomUUID(),
 
-  app.get('/servers/:serverId/channels/:channelId/messages', { preHandler: authenticate }, async (request, reply) => {
-    const server = readServers().find((s) => s.id === request.params.serverId)
-    if (!server || !(server.members || []).includes(request.user.id)) return reply.code(403).send({ error: 'Sem acesso.' })
-    const messages = readJson(SERVER_MESSAGES_FILE).filter((m) => m.serverId === server.id && m.channelId === request.params.channelId).slice(-200).map((m) => ({ ...m, author: publicUser(getUserById(m.authorId)) }))
-    return { messages }
-  })
+            name:
+              'Geral',
 
-  app.post('/servers/:serverId/channels/:channelId/messages', { preHandler: authenticate }, async (request, reply) => {
-    const server = readServers().find((s) => s.id === request.params.serverId)
-    if (!server || !(server.members || []).includes(request.user.id)) return reply.code(403).send({ error: 'Sem acesso.' })
-    const channel = (server.channels || []).find((c) => c.id === request.params.channelId && c.type === 'text')
-    if (!channel) return reply.code(404).send({ error: 'Canal de texto não encontrado.' })
-    const content = String(request.body?.content || '').trim().slice(0, 4000); if (!content) return reply.code(400).send({ error: 'Mensagem vazia.' })
-    const all = readJson(SERVER_MESSAGES_FILE); const message = { id: crypto.randomUUID(), serverId: server.id, channelId: channel.id, authorId: request.user.id, content, createdAt: new Date().toISOString() }
-    all.push(message); writeJson(SERVER_MESSAGES_FILE, all); return { message: { ...message, author: publicUser(getUserById(request.user.id)) } }
-  })
+            type:
+              'voice'
+          }
+        ]
 
-  app.patch('/servers/:serverId/members/:memberId/role', { preHandler: authenticate }, async (request, reply) => {
-    const servers = readServers(); const server = servers.find((s) => s.id === request.params.serverId)
-    if (!server) return reply.code(404).send({ error: 'Servidor não encontrado.' })
-    if (server.ownerId !== request.user.id) return reply.code(403).send({ error: 'Somente o dono gerencia cargos.' })
-    if (request.params.memberId === server.ownerId) return reply.code(400).send({ error: 'O cargo do dono não pode ser alterado.' })
-    const role = request.body?.role; if (!['member','moderator','admin'].includes(role)) return reply.code(400).send({ error: 'Cargo inválido.' })
-    server.memberRoles = server.memberRoles || {}; server.memberRoles[request.params.memberId] = role; writeJson(SERVERS_FILE, servers); return { server }
-  })
+      server.memberRoles =
+        server.memberRoles ||
+        {
+          [server.ownerId]:
+            'owner'
+        }
 
-  app.patch('/profile', { preHandler: authenticate }, async (request, reply) => {
-    const users = readUsers(); const user = users.find((u) => u.id === request.user.id); if (!user) return reply.code(404).send({ error: 'Usuário não encontrado.' })
-    const { username, displayName, avatarUrl } = request.body || {}
-    if (typeof username === 'string') { const normalized = normalizeUsername(username); if (normalized.length < 3) return reply.code(400).send({ error: 'Nome de usuário muito curto.' }); if (users.some((u) => u.id !== user.id && normalizeUsername(u.username) === normalized)) return reply.code(409).send({ error: 'Nome de usuário já está em uso.' }); user.username = normalized }
-    if (typeof displayName === 'string' && displayName.trim()) user.displayName = displayName.trim().slice(0, 40)
-    if (typeof avatarUrl === 'string') user.avatarUrl = avatarUrl.slice(0, 1500000)
-    writeJson(USERS_FILE, users); return { user: publicUser(user) }
-  })
+      const members =
+        (
+          server.members ||
+          []
+        )
+          .map(
+            (id) => {
+              const member =
+                publicUser(
+                  getUserById(
+                    id
+                  )
+                )
 
+              if (!member) {
+                return null
+              }
+
+              return {
+                ...member,
+
+                role:
+                  id ===
+                  server.ownerId
+                    ? 'owner'
+                    : (
+                      server
+                        .memberRoles[
+                        id
+                      ] ||
+                      'member'
+                    )
+              }
+            }
+          )
+          .filter(Boolean)
+
+      return {
+        server,
+        members
+      }
+    }
+  )
+
+  app.patch(
+    '/servers/:serverId',
+    {
+      preHandler:
+        authenticate
+    },
+
+    async (
+      request,
+      reply
+    ) => {
+      const servers =
+        readServers()
+
+      const server =
+        servers.find(
+          (item) =>
+            item.id ===
+            request.params
+              .serverId
+        )
+
+      if (!server) {
+        return reply
+          .code(404)
+          .send({
+            error:
+              'Servidor não encontrado.'
+          })
+      }
+
+      if (
+        server.ownerId !==
+        request.user.id
+      ) {
+        return reply
+          .code(403)
+          .send({
+            error:
+              'Somente o dono pode alterar o servidor.'
+          })
+      }
+
+      const {
+        name,
+        iconUrl
+      } =
+        request.body || {}
+
+      if (
+        typeof name ===
+          'string' &&
+        name.trim().length >=
+          2
+      ) {
+        server.name =
+          name
+            .trim()
+            .slice(
+              0,
+              40
+            )
+      }
+
+      if (
+        typeof iconUrl ===
+        'string'
+      ) {
+        server.iconUrl =
+          iconUrl.slice(
+            0,
+            1500000
+          )
+      }
+
+      writeJson(
+        SERVERS_FILE,
+        servers
+      )
+
+      return {
+        server
+      }
+    }
+  )
+
+  app.delete(
+    '/servers/:serverId',
+    {
+      preHandler:
+        authenticate
+    },
+
+    async (
+      request,
+      reply
+    ) => {
+      const servers =
+        readServers()
+
+      const server =
+        servers.find(
+          (item) =>
+            item.id ===
+            request.params
+              .serverId
+        )
+
+      if (!server) {
+        return reply
+          .code(404)
+          .send({
+            error:
+              'Servidor não encontrado.'
+          })
+      }
+
+      if (
+        server.ownerId !==
+        request.user.id
+      ) {
+        return reply
+          .code(403)
+          .send({
+            error:
+              'Somente o dono pode excluir o servidor.'
+          })
+      }
+
+      writeJson(
+        SERVERS_FILE,
+
+        servers.filter(
+          (item) =>
+            item.id !==
+            server.id
+        )
+      )
+
+      const all =
+        readJson(
+          SERVER_MESSAGES_FILE
+        )
+
+      writeJson(
+        SERVER_MESSAGES_FILE,
+
+        all.filter(
+          (message) =>
+            message.serverId !==
+            server.id
+        )
+      )
+
+      const readStates =
+        readServerReadState()
+
+      writeJson(
+        SERVER_READ_STATE_FILE,
+
+        readStates.filter(
+          (item) =>
+            item.serverId !==
+            server.id
+        )
+      )
+
+      return {
+        ok: true
+      }
+    }
+  )
+
+  // ====================================================
+  // CANAIS
+  // ====================================================
+
+  app.post(
+    '/servers/:serverId/channels',
+    {
+      preHandler:
+        authenticate
+    },
+
+    async (
+      request,
+      reply
+    ) => {
+      const servers =
+        readServers()
+
+      const server =
+        servers.find(
+          (item) =>
+            item.id ===
+            request.params
+              .serverId
+        )
+
+      if (!server) {
+        return reply
+          .code(404)
+          .send({
+            error:
+              'Servidor não encontrado.'
+          })
+      }
+
+      const role =
+        request.user.id ===
+        server.ownerId
+          ? 'owner'
+          : (
+            server
+              .memberRoles
+              ?.[
+                request.user.id
+              ] ||
+            'member'
+          )
+
+      if (
+        ![
+          'owner',
+          'admin',
+          'moderator'
+        ].includes(
+          role
+        )
+      ) {
+        return reply
+          .code(403)
+          .send({
+            error:
+              'Você não pode criar canais.'
+          })
+      }
+
+      const {
+        name,
+        type
+      } =
+        request.body || {}
+
+      if (
+        !name?.trim() ||
+        ![
+          'voice',
+          'text'
+        ].includes(
+          type
+        )
+      ) {
+        return reply
+          .code(400)
+          .send({
+            error:
+              'Canal inválido.'
+          })
+      }
+
+      server.channels =
+        server.channels ||
+        []
+
+      const channel = {
+        id:
+          crypto.randomUUID(),
+
+        name:
+          name
+            .trim()
+            .slice(
+              0,
+              30
+            ),
+
+        type
+      }
+
+      server.channels.push(
+        channel
+      )
+
+      writeJson(
+        SERVERS_FILE,
+        servers
+      )
+
+      return {
+        server,
+        channel
+      }
+    }
+  )
+
+  app.delete(
+    '/servers/:serverId/channels/:channelId',
+    {
+      preHandler:
+        authenticate
+    },
+
+    async (
+      request,
+      reply
+    ) => {
+      const servers =
+        readServers()
+
+      const server =
+        servers.find(
+          (item) =>
+            item.id ===
+            request.params
+              .serverId
+        )
+
+      if (!server) {
+        return reply
+          .code(404)
+          .send({
+            error:
+              'Servidor não encontrado.'
+          })
+      }
+
+      const role =
+        request.user.id ===
+        server.ownerId
+          ? 'owner'
+          : (
+            server
+              .memberRoles
+              ?.[
+                request.user.id
+              ] ||
+            'member'
+          )
+
+      if (
+        ![
+          'owner',
+          'admin',
+          'moderator'
+        ].includes(
+          role
+        )
+      ) {
+        return reply
+          .code(403)
+          .send({
+            error:
+              'Você não pode excluir canais.'
+          })
+      }
+
+      server.channels =
+        server.channels ||
+        []
+
+      const target =
+        server.channels.find(
+          (channel) =>
+            channel.id ===
+            request.params
+              .channelId
+        )
+
+      if (
+        target?.type ===
+          'voice' &&
+        server.channels
+          .filter(
+            (channel) =>
+              channel.type ===
+              'voice'
+          )
+          .length <=
+          1
+      ) {
+        return reply
+          .code(400)
+          .send({
+            error:
+              'O servidor precisa ter ao menos um canal de voz.'
+          })
+      }
+
+      server.channels =
+        server.channels
+          .filter(
+            (channel) =>
+              channel.id !==
+              request.params
+                .channelId
+          )
+
+      writeJson(
+        SERVERS_FILE,
+        servers
+      )
+
+      const all =
+        readJson(
+          SERVER_MESSAGES_FILE
+        )
+
+      writeJson(
+        SERVER_MESSAGES_FILE,
+
+        all.filter(
+          (message) =>
+            message.channelId !==
+            request.params
+              .channelId
+        )
+      )
+
+      const readStates =
+        readServerReadState()
+
+      writeJson(
+        SERVER_READ_STATE_FILE,
+
+        readStates.filter(
+          (item) =>
+            item.channelId !==
+            request.params
+              .channelId
+        )
+      )
+
+      return {
+        server
+      }
+    }
+  )
+
+  // ====================================================
+  // NÃO LIDAS
+  // ====================================================
+
+  app.get(
+    '/servers/:serverId/unread',
+    {
+      preHandler:
+        authenticate
+    },
+
+    async (
+      request,
+      reply
+    ) => {
+      const server =
+        readServers()
+          .find(
+            (item) =>
+              item.id ===
+              request.params
+                .serverId
+          )
+
+      if (
+        !server ||
+        !(
+          server.members ||
+          []
+        ).includes(
+          request.user.id
+        )
+      ) {
+        return reply
+          .code(403)
+          .send({
+            error:
+              'Sem acesso.'
+          })
+      }
+
+      const states =
+        readServerReadState()
+
+      const allMessages =
+        readJson(
+          SERVER_MESSAGES_FILE
+        )
+
+      const unread = {}
+
+      for (
+        const channel
+        of (
+          server.channels ||
+          []
+        ).filter(
+          (item) =>
+            item.type ===
+            'text'
+        )
+      ) {
+        const state =
+          states.find(
+            (item) =>
+              item.userId ===
+                request.user.id &&
+              item.serverId ===
+                server.id &&
+              item.channelId ===
+                channel.id
+          )
+
+        const lastReadAt =
+          state?.lastReadAt
+            ? new Date(
+              state.lastReadAt
+            ).getTime()
+            : 0
+
+        unread[
+          channel.id
+        ] =
+          allMessages
+            .filter(
+              (message) =>
+                message.serverId ===
+                  server.id &&
+                message.channelId ===
+                  channel.id &&
+                message.authorId !==
+                  request.user.id &&
+                new Date(
+                  message.createdAt
+                ).getTime() >
+                  lastReadAt
+            )
+            .length
+      }
+
+      return {
+        unread
+      }
+    }
+  )
+
+  // ====================================================
+  // MENSAGENS DE SERVIDOR
+  // ====================================================
+
+  app.get(
+    '/servers/:serverId/channels/:channelId/messages',
+    {
+      preHandler:
+        authenticate
+    },
+
+    async (
+      request,
+      reply
+    ) => {
+      const server =
+        readServers()
+          .find(
+            (item) =>
+              item.id ===
+              request.params
+                .serverId
+          )
+
+      if (
+        !server ||
+        !(
+          server.members ||
+          []
+        ).includes(
+          request.user.id
+        )
+      ) {
+        return reply
+          .code(403)
+          .send({
+            error:
+              'Sem acesso.'
+          })
+      }
+
+      const messages =
+        readJson(
+          SERVER_MESSAGES_FILE
+        )
+          .filter(
+            (message) =>
+              message.serverId ===
+                server.id &&
+              message.channelId ===
+                request.params
+                  .channelId
+          )
+          .slice(-200)
+          .map(
+            (message) => ({
+              ...message,
+
+              author:
+                publicUser(
+                  getUserById(
+                    message.authorId
+                  )
+                )
+            })
+          )
+
+      markServerChannelRead(
+        request.user.id,
+        server.id,
+        request.params
+          .channelId
+      )
+
+      return {
+        messages
+      }
+    }
+  )
+
+  app.post(
+    '/servers/:serverId/channels/:channelId/messages',
+    {
+      preHandler:
+        authenticate
+    },
+
+    async (
+      request,
+      reply
+    ) => {
+      const server =
+        readServers()
+          .find(
+            (item) =>
+              item.id ===
+              request.params
+                .serverId
+          )
+
+      if (
+        !server ||
+        !(
+          server.members ||
+          []
+        ).includes(
+          request.user.id
+        )
+      ) {
+        return reply
+          .code(403)
+          .send({
+            error:
+              'Sem acesso.'
+          })
+      }
+
+      const channel =
+        (
+          server.channels ||
+          []
+        )
+          .find(
+            (item) =>
+              item.id ===
+                request.params
+                  .channelId &&
+              item.type ===
+                'text'
+          )
+
+      if (!channel) {
+        return reply
+          .code(404)
+          .send({
+            error:
+              'Canal de texto não encontrado.'
+          })
+      }
+
+      const content =
+        String(
+          request.body
+            ?.content ||
+          ''
+        )
+          .trim()
+          .slice(
+            0,
+            4000
+          )
+
+      const attachment =
+        normalizeAttachment(
+          request.body
+            ?.attachment
+        )
+
+      if (
+        !content &&
+        !attachment
+      ) {
+        return reply
+          .code(400)
+          .send({
+            error:
+              'Mensagem vazia.'
+          })
+      }
+
+      const all =
+        readJson(
+          SERVER_MESSAGES_FILE
+        )
+
+      const message = {
+        id:
+          crypto.randomUUID(),
+
+        serverId:
+          server.id,
+
+        channelId:
+          channel.id,
+
+        authorId:
+          request.user.id,
+
+        content,
+        attachment,
+
+        createdAt:
+          new Date()
+            .toISOString()
+      }
+
+      all.push(
+        message
+      )
+
+      writeJson(
+        SERVER_MESSAGES_FILE,
+        all
+      )
+
+      markServerChannelRead(
+        request.user.id,
+        server.id,
+        channel.id
+      )
+
+      return {
+        message: {
+          ...message,
+
+          author:
+            publicUser(
+              getUserById(
+                request.user.id
+              )
+            )
+        }
+      }
+    }
+  )
+
+  // ====================================================
+  // CARGOS
+  // ====================================================
+
+  app.patch(
+    '/servers/:serverId/members/:memberId/role',
+    {
+      preHandler:
+        authenticate
+    },
+
+    async (
+      request,
+      reply
+    ) => {
+      const servers =
+        readServers()
+
+      const server =
+        servers.find(
+          (item) =>
+            item.id ===
+            request.params
+              .serverId
+        )
+
+      if (!server) {
+        return reply
+          .code(404)
+          .send({
+            error:
+              'Servidor não encontrado.'
+          })
+      }
+
+      if (
+        server.ownerId !==
+        request.user.id
+      ) {
+        return reply
+          .code(403)
+          .send({
+            error:
+              'Somente o dono gerencia cargos.'
+          })
+      }
+
+      if (
+        request.params
+          .memberId ===
+        server.ownerId
+      ) {
+        return reply
+          .code(400)
+          .send({
+            error:
+              'O cargo do dono não pode ser alterado.'
+          })
+      }
+
+      const role =
+        request.body
+          ?.role
+
+      if (
+        ![
+          'member',
+          'moderator',
+          'admin'
+        ].includes(
+          role
+        )
+      ) {
+        return reply
+          .code(400)
+          .send({
+            error:
+              'Cargo inválido.'
+          })
+      }
+
+      server.memberRoles =
+        server.memberRoles ||
+        {}
+
+      server.memberRoles[
+        request.params
+          .memberId
+      ] =
+        role
+
+      writeJson(
+        SERVERS_FILE,
+        servers
+      )
+
+      return {
+        server
+      }
+    }
+  )
+
+  // ====================================================
+  // PERFIL
+  // ====================================================
+
+  app.patch(
+    '/profile',
+    {
+      preHandler:
+        authenticate
+    },
+
+    async (
+      request,
+      reply
+    ) => {
+      const users =
+        readUsers()
+
+      const user =
+        users.find(
+          (item) =>
+            item.id ===
+            request.user.id
+        )
+
+      if (!user) {
+        return reply
+          .code(404)
+          .send({
+            error:
+              'Usuário não encontrado.'
+          })
+      }
+
+      const {
+        username,
+        displayName,
+        avatarUrl
+      } =
+        request.body || {}
+
+      if (
+        typeof username ===
+        'string'
+      ) {
+        const normalized =
+          normalizeUsername(
+            username
+          )
+
+        if (
+          normalized.length <
+          3
+        ) {
+          return reply
+            .code(400)
+            .send({
+              error:
+                'Nome de usuário muito curto.'
+            })
+        }
+
+        if (
+          users.some(
+            (item) =>
+              item.id !==
+                user.id &&
+              normalizeUsername(
+                item.username
+              ) ===
+                normalized
+          )
+        ) {
+          return reply
+            .code(409)
+            .send({
+              error:
+                'Nome de usuário já está em uso.'
+            })
+        }
+
+        user.username =
+          normalized
+      }
+
+      if (
+        typeof displayName ===
+          'string' &&
+        displayName.trim()
+      ) {
+        user.displayName =
+          displayName
+            .trim()
+            .slice(
+              0,
+              40
+            )
+      }
+
+      if (
+        typeof avatarUrl ===
+        'string'
+      ) {
+        user.avatarUrl =
+          avatarUrl.slice(
+            0,
+            1500000
+          )
+      }
+
+      writeJson(
+        USERS_FILE,
+        users
+      )
+
+      return {
+        user:
+          publicUser(
+            user
+          )
+      }
+    }
+  )
 
   // ====================================================
   // START SERVER
@@ -1677,9 +2900,9 @@ async function start() {
 
   try {
     await app.listen({
-  port: PORT,
-  host: '0.0.0.0'
-})
+      port: PORT,
+      host: '0.0.0.0'
+    })
 
     console.log(
       `Concord API rodando em http://127.0.0.1:${PORT}`

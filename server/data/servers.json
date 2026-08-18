@@ -19,6 +19,11 @@
         "id": "69490eba-b9ff-44ec-b4b8-4f45368540fc",
         "name": "aaa",
         "type": "text"
+      },
+      {
+        "id": "80911cae-2e63-4f4a-b199-c4c4bf8abb73",
+        "name": "Praça",
+        "type": "voice"
       }
     ],
     "createdAt": "2026-08-17T22:05:44.192Z",
