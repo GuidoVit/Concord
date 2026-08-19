@@ -1,4 +1,4 @@
-import type { Conversation, Screen, User } from '../../types/concord'
+import type { Conversation, Screen, User } from '../../types/harmony'
 import { Avatar } from '../common/Avatar'
 
 interface SocialSidebarProps {
@@ -29,7 +29,7 @@ export function SocialSidebar({
   return (
     <aside className="sidebar">
       <div className="sidebar-title">
-        <strong>Concord</strong>
+        <strong>Harmony</strong>
       </div>
 
       <nav>
@@ -113,7 +113,7 @@ export function SocialSidebar({
         <button
           onClick={openProfileSettings}
           title="Configurações"
-          aria-label="Abrir configurações do Concord"
+          aria-label="Abrir configurações do Harmony"
         >
           ⚙
         </button>
@@ -121,7 +121,7 @@ export function SocialSidebar({
         <button
           onClick={logout}
           title="Sair"
-          aria-label="Sair do Concord"
+          aria-label="Sair do Harmony"
         >
           ↪
         </button>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import type { AuthMode, Screen, User } from '../types/concord'
+import type { AuthMode, Screen, User } from '../types/harmony'
 import { apiRequest } from '../services/apiClient'
 
 export function useAuth({
@@ -19,7 +19,7 @@ export function useAuth({
   const [sessionReady, setSessionReady] = useState(false)
 
   const restoreSession = useCallback(async () => {
-    const token = localStorage.getItem('concord_token')
+    const token = localStorage.getItem('harmony_token') ?? localStorage.getItem('concord_token')
 
     if (!token) {
       setSessionReady(true)
@@ -31,6 +31,7 @@ export function useAuth({
       setUser(data.user)
       setScreen('home')
     } catch {
+      localStorage.removeItem('harmony_token')
       localStorage.removeItem('concord_token')
     } finally {
       setSessionReady(true)
@@ -52,6 +53,7 @@ export function useAuth({
         body: JSON.stringify({ username, password })
       })
 
+      localStorage.setItem('harmony_token', data.token)
       localStorage.setItem('concord_token', data.token)
       setUser(data.user)
       setScreen('home')
@@ -79,6 +81,7 @@ export function useAuth({
         body: JSON.stringify({ username, displayName, password })
       })
 
+      localStorage.setItem('harmony_token', data.token)
       localStorage.setItem('concord_token', data.token)
       setUser(data.user)
       setScreen('home')
@@ -90,7 +93,8 @@ export function useAuth({
   }
 
   const logoutAuth = useCallback(() => {
-    localStorage.removeItem('concord_token')
+    localStorage.removeItem('harmony_token')
+      localStorage.removeItem('concord_token')
     setUser(null)
     setPassword('')
     setConfirmPassword('')

@@ -3,22 +3,37 @@ import {
   useMemo,
   useRef,
   useState,
-  type MouseEvent
+  type MouseEvent,
+  type WheelEvent
 } from 'react'
 import type { LocalVideoTrack, RemoteVideoTrack } from 'livekit-client'
 
 import type {
   ScreenShareQuality,
+  User,
   VoiceParticipant
-} from '../../types/concord'
+} from '../../types/harmony'
 import {
   SCREEN_SHARE_PROFILES,
   type ActiveScreenShare
 } from '../../hooks/useScreenShare'
+import { ContextMenu } from '../common/ContextMenu'
+import {
+  HeadphonesIcon,
+  HeadphonesOffIcon,
+  MicIcon,
+  MicOffIcon,
+  PhoneOffIcon,
+  ScreenIcon,
+  UserPlusIcon,
+  ZoomInIcon
+} from '../common/Icons'
+import { CallTimer } from './CallTimer'
 
 interface VoiceRoomProps {
   activeVoiceName: string
   activeVoiceId?: string
+  callStartedAt?: string | null
 
   muted: boolean
   deafened: boolean
@@ -29,6 +44,7 @@ interface VoiceRoomProps {
 
   participantVolumes: Record<string, number>
   screenShareVolumes: Record<string, number>
+  selfMicGain: number
 
   screenSharing: boolean
   screenShareStarting: boolean
@@ -39,6 +55,9 @@ interface VoiceRoomProps {
 
   screenQuality: ScreenShareQuality
 
+  friends: User[]
+  sendFriendRequest: (username: string) => Promise<unknown> | unknown
+
   connectVoice: (channelId: string) => void
   disconnectVoice: () => void
 
@@ -47,36 +66,33 @@ interface VoiceRoomProps {
 
   setParticipantVolume: (identity: string, volume: number) => void
   setScreenShareVolume: (identity: string, volume: number) => void
+  setSelfMicGain: (gain: number) => void
 
   openScreenPicker: () => void
   stopScreenShare: () => void
 }
 
-type VolumeMenu =
-  | {
-      kind: 'participant'
-      identity: string
-      label: string
-      x: number
-      y: number
-    }
-  | {
-      kind: 'screen'
-      identity: string
-      label: string
-      x: number
-      y: number
-    }
-  | null
+type VoiceMenu = {
+  kind: 'participant' | 'self' | 'screen'
+  identity: string
+  label: string
+  username?: string
+  x: number
+  y: number
+} | null
 
 function ScreenVideo({
   track,
   className,
-  muted = true
+  zoom = 1,
+  originX = 50,
+  originY = 50
 }: {
   track: RemoteVideoTrack | LocalVideoTrack
   className: string
-  muted?: boolean
+  zoom?: number
+  originX?: number
+  originY?: number
 }) {
   const ref = useRef<HTMLVideoElement | null>(null)
 
@@ -86,23 +102,19 @@ function ScreenVideo({
 
     video.autoplay = true
     video.playsInline = true
-    video.muted = muted
+    video.muted = true
 
     try {
       track.attach(video)
       void video.play().catch(() => {})
     } catch (error) {
-      console.warn('Concord: não foi possível anexar a transmissão:', error)
+      console.warn('Harmony: não foi possível anexar a transmissão:', error)
     }
 
     return () => {
-      try {
-        track.detach(video)
-      } catch {
-        // A transmissão pode ter terminado antes do componente desmontar.
-      }
+      try { track.detach(video) } catch {}
     }
-  }, [track, muted])
+  }, [track])
 
   return (
     <video
@@ -110,7 +122,11 @@ function ScreenVideo({
       className={className}
       autoPlay
       playsInline
-      muted={muted}
+      muted
+      style={{
+        transform: `scale(${zoom})`,
+        transformOrigin: `${originX}% ${originY}%`
+      }}
     />
   )
 }
@@ -119,336 +135,292 @@ export function VoiceRoom(props: VoiceRoomProps) {
   const {
     activeVoiceName,
     activeVoiceId,
-
+    callStartedAt,
     muted,
     deafened,
-
     voiceConnected,
     voiceConnecting,
     voiceParticipants,
-
     participantVolumes,
     screenShareVolumes,
-
+    selfMicGain,
     screenSharing,
     screenShareStarting,
-
     screenShares,
     selectedScreenShareIdentity,
     selectScreenShare,
-
     screenQuality,
-
+    friends,
+    sendFriendRequest,
     connectVoice,
     disconnectVoice,
-
     toggleMicrophone,
     toggleDeafen,
-
     setParticipantVolume,
     setScreenShareVolume,
-
+    setSelfMicGain,
     openScreenPicker,
     stopScreenShare
   } = props
 
-  const [volumeMenu, setVolumeMenu] = useState<VolumeMenu>(null)
+  const [menu, setMenu] = useState<VoiceMenu>(null)
+  const [focusShare, setFocusShare] = useState(false)
+  const [zoomByIdentity, setZoomByIdentity] = useState<
+    Record<string, { scale: number; originX: number; originY: number }>
+  >({})
 
-  const profile = SCREEN_SHARE_PROFILES.find(
-    (item) => item.id === screenQuality
-  )
+  const profile = SCREEN_SHARE_PROFILES.find((item) => item.id === screenQuality)
 
   const selectedShare = useMemo(
     () =>
-      screenShares.find(
-        (share) => share.identity === selectedScreenShareIdentity
-      ) ||
+      screenShares.find((share) => share.identity === selectedScreenShareIdentity) ||
       screenShares[0] ||
       null,
     [screenShares, selectedScreenShareIdentity]
   )
 
+  const friendIds = useMemo(() => new Set(friends.map((friend) => friend.id)), [friends])
+  const friendUsernames = useMemo(
+    () => new Set(friends.map((friend) => friend.username.toLowerCase())),
+    [friends]
+  )
+
   useEffect(() => {
-    const close = () => setVolumeMenu(null)
+    if (!selectedShare) setFocusShare(false)
+  }, [selectedShare])
 
-    window.addEventListener('blur', close)
-    window.addEventListener('resize', close)
-    document.addEventListener('click', close)
-
-    return () => {
-      window.removeEventListener('blur', close)
-      window.removeEventListener('resize', close)
-      document.removeEventListener('click', close)
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFocusShare(false)
     }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const openParticipantMenu = (
-    event: MouseEvent,
-    participant: VoiceParticipant
-  ) => {
-    if (participant.isLocal) return
-
+  const openParticipantMenu = (event: MouseEvent, participant: VoiceParticipant) => {
     event.preventDefault()
     event.stopPropagation()
 
-    setVolumeMenu({
-      kind: 'participant',
+    setMenu({
+      kind: participant.isLocal ? 'self' : 'participant',
       identity: participant.identity,
       label: participant.name,
-      x: Math.min(event.clientX, window.innerWidth - 290),
-      y: Math.min(event.clientY, window.innerHeight - 190)
+      username: participant.username,
+      x: event.clientX,
+      y: event.clientY
     })
   }
 
-  const openScreenMenu = (
-    event: MouseEvent,
-    share: ActiveScreenShare
-  ) => {
+  const openScreenMenu = (event: MouseEvent, share: ActiveScreenShare) => {
     if (share.isLocal) return
-
     event.preventDefault()
     event.stopPropagation()
 
-    setVolumeMenu({
+    setMenu({
       kind: 'screen',
       identity: share.identity,
       label: `Tela de ${share.name}`,
-      x: Math.min(event.clientX, window.innerWidth - 290),
-      y: Math.min(event.clientY, window.innerHeight - 190)
+      x: event.clientX,
+      y: event.clientY
     })
   }
 
-  const menuVolume = volumeMenu
-    ? volumeMenu.kind === 'participant'
-      ? participantVolumes[volumeMenu.identity] ?? 1
-      : screenShareVolumes[volumeMenu.identity] ?? 1
+  const menuVolume = menu
+    ? menu.kind === 'participant'
+      ? participantVolumes[menu.identity] ?? 1
+      : menu.kind === 'screen'
+        ? screenShareVolumes[menu.identity] ?? 1
+        : selfMicGain
     : 1
 
   const updateMenuVolume = (value: number) => {
-    if (!volumeMenu) return
+    if (!menu) return
+    if (menu.kind === 'participant') setParticipantVolume(menu.identity, value)
+    else if (menu.kind === 'screen') setScreenShareVolume(menu.identity, value)
+    else setSelfMicGain(value)
+  }
 
-    if (volumeMenu.kind === 'participant') {
-      setParticipantVolume(volumeMenu.identity, value)
-    } else {
-      setScreenShareVolume(volumeMenu.identity, value)
-    }
+  const currentZoomState =
+    selectedShare
+      ? (
+          zoomByIdentity[selectedShare.identity] ?? {
+            scale: 1,
+            originX: 50,
+            originY: 50
+          }
+        )
+      : {
+          scale: 1,
+          originX: 50,
+          originY: 50
+        }
+
+  const zoomShare = (event: WheelEvent<HTMLDivElement>) => {
+    if (!selectedShare) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const viewport =
+      event.currentTarget.querySelector<HTMLElement>('.screen-share-viewport')
+
+    if (!viewport) return
+
+    const rect = viewport.getBoundingClientRect()
+
+    const originX =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 100
+        )
+      )
+
+    const originY =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          ((event.clientY - rect.top) / Math.max(rect.height, 1)) * 100
+        )
+      )
+
+    const delta = event.deltaY < 0 ? 0.12 : -0.12
+
+    setZoomByIdentity((current) => {
+      const previous =
+        current[selectedShare.identity] ?? {
+          scale: 1,
+          originX: 50,
+          originY: 50
+        }
+
+      const nextScale =
+        Math.max(
+          1,
+          Math.min(
+            3,
+            Number((previous.scale + delta).toFixed(2))
+          )
+        )
+
+      // Em 100% a transmissão sempre volta exatamente para o centro.
+      // Acima de 100%, o ponto sob o cursor continua sendo a origem do zoom.
+      if (nextScale <= 1) {
+        return {
+          ...current,
+          [selectedShare.identity]: {
+            scale: 1,
+            originX: 50,
+            originY: 50
+          }
+        }
+      }
+
+      return {
+        ...current,
+        [selectedShare.identity]: {
+          scale: nextScale,
+          originX,
+          originY
+        }
+      }
+    })
   }
 
   const hasShares = screenShares.length > 0
-  const showShareRail = screenShares.length > 1
+  const showShareRail = screenShares.length > 1 && !focusShare
 
   return (
-    <section className="voice-room">
-      <div
-        className="voice-center"
-        style={
-          hasShares
-            ? {
-                width: '100%',
-                maxWidth: 'none',
-                paddingInline: 20
-              }
-            : undefined
-        }
-      >
+    <section className={`voice-room${focusShare ? ' share-focus-mode' : ''}`}>
+      <div className={`voice-center${hasShares ? ' has-screen-shares' : ''}`}>
         {!hasShares && (
           <>
-            <div
-              className={
-                voiceConnected
-                  ? 'voice-orbit connected'
-                  : 'voice-orbit'
-              }
-            >
+            <div className={voiceConnected ? 'voice-orbit connected' : 'voice-orbit'}>
               {voiceConnected ? '◉' : '○'}
             </div>
-
             <h2>{activeVoiceName || 'Geral'}</h2>
+            {voiceConnected && <CallTimer startedAt={callStartedAt} />}
           </>
         )}
 
         {!voiceConnected ? (
           <>
             <p>Entre no canal para conversar com a galera.</p>
-
             <div className="voice-controls">
               <button
-                className="voice-button share"
-                onClick={() =>
-                  activeVoiceId &&
-                  connectVoice(activeVoiceId)
-                }
-                disabled={
-                  voiceConnecting ||
-                  !activeVoiceId
-                }
+                className="voice-button join-call"
+                onClick={() => activeVoiceId && connectVoice(activeVoiceId)}
+                disabled={voiceConnecting || !activeVoiceId}
               >
-                {voiceConnecting
-                  ? 'Conectando...'
-                  : 'Entrar na call'}
+                {voiceConnecting ? 'Conectando...' : 'Entrar na call'}
               </button>
             </div>
           </>
         ) : (
           <>
             {selectedShare && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: showShareRail
-                    ? 'minmax(0, 1fr) 190px'
-                    : 'minmax(0, 1fr)',
-                  gap: 12,
-                  width: '100%',
-                  maxWidth: 1280,
-                  minHeight: 0,
-                  alignItems: 'stretch'
-                }}
-              >
+              <div className={`screen-share-layout${showShareRail ? ' with-rail' : ''}`}>
                 <div
                   className="screen-share-stage"
-                  onContextMenu={(event) =>
-                    openScreenMenu(event, selectedShare)
-                  }
-                  style={{
-                    minWidth: 0,
-                    margin: 0
-                  }}
+                  onContextMenu={(event) => openScreenMenu(event, selectedShare)}
+                  onClick={() => setFocusShare((current) => !current)}
+                  onWheel={zoomShare}
+                  title={focusShare ? 'Clique para voltar' : 'Clique para focar • Scroll para zoom'}
                 >
                   <div className="screen-share-head">
                     <div>
                       <strong>{selectedShare.name}</strong>
                       <span>está compartilhando</span>
                     </div>
-
-                    <span className="stream-quality">
-                      {profile
-                        ? `${profile.height}p • ${profile.frameRate} FPS`
-                        : 'Transmissão'}
-                    </span>
+                    <div className="screen-share-head-right">
+                      <CallTimer startedAt={callStartedAt} />
+                      <span className="stream-quality">
+                        {profile
+                          ? `${profile.height}p • ${profile.frameRate} FPS`
+                          : 'Transmissão'}
+                      </span>
+                    </div>
                   </div>
 
-                  <ScreenVideo
-                    track={selectedShare.videoTrack}
-                    className="screen-share-video"
-                  />
+                  <div className="screen-share-viewport">
+                    <ScreenVideo
+                      track={selectedShare.videoTrack}
+                      className="screen-share-video"
+                      zoom={currentZoomState.scale}
+                      originX={currentZoomState.originX}
+                      originY={currentZoomState.originY}
+                    />
+                    <div className="screen-zoom-indicator">
+                      <ZoomInIcon /> {Math.round(currentZoomState.scale * 100)}%
+                    </div>
+                  </div>
                 </div>
 
                 {showShareRail && (
-                  <aside
-                    aria-label="Transmissões ativas"
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                      overflowY: 'auto',
-                      maxHeight: 560,
-                      minWidth: 0,
-                      paddingRight: 2
-                    }}
-                  >
+                  <aside className="screen-share-rail" aria-label="Transmissões ativas">
                     {screenShares.map((share, index) => {
-                      const selected =
-                        share.identity === selectedShare.identity
-
+                      const selected = share.identity === selectedShare.identity
                       return (
                         <button
                           key={share.identity}
                           type="button"
+                          className={`screen-share-preview-card${selected ? ' selected' : ''}`}
                           title={`Assistir tela de ${share.name}`}
-                          onClick={() =>
-                            selectScreenShare(share.identity)
-                          }
-                          onContextMenu={(event) =>
-                            openScreenMenu(event, share)
-                          }
-                          style={{
-                            display: 'block',
-                            width: '100%',
-                            padding: 6,
-                            borderRadius: 12,
-                            border: selected
-                              ? '2px solid #35e6b4'
-                              : '1px solid rgba(255,255,255,.12)',
-                            background: selected
-                              ? 'rgba(53,230,180,.09)'
-                              : '#10161a',
-                            color: 'inherit',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            boxShadow: selected
-                              ? '0 0 0 1px rgba(53,230,180,.15)'
-                              : 'none'
-                          }}
+                          onClick={() => selectScreenShare(share.identity)}
+                          onContextMenu={(event) => openScreenMenu(event, share)}
                         >
-                          <div
-                            style={{
-                              position: 'relative',
-                              overflow: 'hidden',
-                              aspectRatio: '16 / 9',
-                              borderRadius: 8,
-                              background: '#050708'
-                            }}
-                          >
+                          <div className="screen-share-preview-frame">
                             <ScreenVideo
                               track={share.videoTrack}
                               className="screen-share-preview-video"
                             />
-
-                            <span
-                              style={{
-                                position: 'absolute',
-                                left: 6,
-                                top: 6,
-                                display: 'grid',
-                                placeItems: 'center',
-                                minWidth: 22,
-                                height: 22,
-                                paddingInline: 5,
-                                borderRadius: 999,
-                                background: 'rgba(0,0,0,.72)',
-                                color: '#fff',
-                                fontSize: 11,
-                                fontWeight: 800
-                              }}
-                            >
-                              {index + 1}
-                            </span>
+                            <span className="screen-share-number">{index + 1}</span>
                           </div>
-
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              marginTop: 6,
-                              minWidth: 0
-                            }}
-                          >
-                            <span
-                              style={{
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                fontSize: 12,
-                                fontWeight: selected ? 800 : 650
-                              }}
-                            >
-                              {share.name}
-                            </span>
-
-                            {selected && (
-                              <span
-                                style={{
-                                  marginLeft: 'auto',
-                                  fontSize: 9,
-                                  fontWeight: 900,
-                                  color: '#35e6b4'
-                                }}
-                              >
-                                ATIVA
-                              </span>
-                            )}
+                          <div className="screen-share-preview-name">
+                            <span>{share.name}</span>
+                            {selected && <b>ATIVA</b>}
                           </div>
                         </button>
                       )
@@ -458,123 +430,128 @@ export function VoiceRoom(props: VoiceRoomProps) {
               </div>
             )}
 
-            <div className="voice-participant-grid">
-              {voiceParticipants.map((participant) => (
-                <div
-                  key={participant.identity}
-                  className={
-                    participant.isSpeaking
-                      ? 'voice-person speaking'
-                      : 'voice-person'
-                  }
-                  onContextMenu={(event) =>
-                    openParticipantMenu(event, participant)
-                  }
-                >
-                  <div className="voice-avatar">
-                    {participant.avatarUrl ? (
-                      <img
-                        src={participant.avatarUrl}
-                        alt={participant.name}
-                      />
-                    ) : (
-                      participant.name
-                        .charAt(0)
-                        .toUpperCase()
-                    )}
-                  </div>
+            {!focusShare && (
+              <>
+                <div className="voice-participant-grid">
+                  {voiceParticipants.map((participant) => {
+                    const mutedParticipant = Boolean(participant.isMuted || participant.isDeafened)
+                    const classes = [
+                      'voice-person',
+                      participant.isSpeaking && !mutedParticipant ? 'speaking' : '',
+                      mutedParticipant ? 'muted-participant' : '',
+                      participant.isDeafened ? 'deafened-participant' : ''
+                    ].filter(Boolean).join(' ')
 
-                  <strong className="voice-person-name">
-                    {participant.name}
-                  </strong>
+                    return (
+                      <div
+                        key={participant.identity}
+                        className={classes}
+                        onContextMenu={(event) => openParticipantMenu(event, participant)}
+                      >
+                        <div className="voice-avatar-wrap">
+                          <div className="voice-avatar">
+                            {participant.avatarUrl ? (
+                              <img src={participant.avatarUrl} alt={participant.name} />
+                            ) : (
+                              participant.name.charAt(0).toUpperCase()
+                            )}
+                          </div>
 
-                  <span>
-                    {participant.isSpeaking
-                      ? 'Falando'
-                      : 'Na call'}
-                  </span>
+                          {(participant.isMuted || participant.isDeafened) && (
+                            <div className="voice-status-icons">
+                              {participant.isMuted && (
+                                <span
+                                  className="voice-status-icon"
+                                  title="Microfone mutado"
+                                  aria-label="Microfone mutado"
+                                >
+                                  <MicOffIcon />
+                                </span>
+                              )}
+
+                              {participant.isDeafened && (
+                                <span
+                                  className="voice-status-icon voice-status-icon-audio"
+                                  title="Áudio desligado"
+                                  aria-label="Áudio desligado"
+                                >
+                                  <HeadphonesOffIcon />
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <strong className="voice-person-name">{participant.name}</strong>
+                        <span>
+                          {participant.isDeafened
+                            ? 'Áudio desligado'
+                            : participant.isMuted
+                              ? 'Microfone mutado'
+                              : participant.isSpeaking
+                                ? 'Falando'
+                                : 'Na call'}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
-              ))}
-            </div>
 
-            <div className="voice-controls">
-              <button
-                className={
-                  muted
-                    ? 'voice-button off'
-                    : 'voice-button'
-                }
-                onClick={toggleMicrophone}
-              >
-                {muted
-                  ? 'Mic desligado'
-                  : 'Microfone'}
-              </button>
+                <div className="voice-controls icon-controls">
+                  <button
+                    className={`voice-icon-button${muted ? ' off' : ''}`}
+                    onClick={toggleMicrophone}
+                    title={muted ? 'Ativar microfone' : 'Mutar microfone'}
+                    disabled={deafened}
+                    aria-label={muted ? 'Ativar microfone' : 'Mutar microfone'}
+                  >
+                    {muted ? <MicOffIcon /> : <MicIcon />}
+                  </button>
 
-              <button
-                className={
-                  deafened
-                    ? 'voice-button off'
-                    : 'voice-button'
-                }
-                onClick={toggleDeafen}
-              >
-                {deafened
-                  ? 'Áudio desligado'
-                  : 'Áudio'}
-              </button>
+                  <button
+                    className={`voice-icon-button${deafened ? ' off' : ''}`}
+                    onClick={toggleDeafen}
+                    title={deafened ? 'Ativar áudio dos usuários' : 'Desativar áudio dos usuários'}
+                    aria-label={deafened ? 'Ativar áudio dos usuários' : 'Desativar áudio dos usuários'}
+                  >
+                    {deafened ? <HeadphonesOffIcon /> : <HeadphonesIcon />}
+                  </button>
 
-              <button
-                className={
-                  screenSharing
-                    ? 'voice-button screen-active'
-                    : 'voice-button screen-share'
-                }
-                disabled={screenShareStarting}
-                onClick={
-                  screenSharing
-                    ? stopScreenShare
-                    : openScreenPicker
-                }
-              >
-                {screenShareStarting
-                  ? 'Preparando...'
-                  : screenSharing
-                    ? 'Parar transmissão'
-                    : 'Compartilhar tela'}
-              </button>
+                  <button
+                    className={`voice-icon-button${screenSharing ? ' screen-active' : ''}`}
+                    disabled={screenShareStarting}
+                    onClick={screenSharing ? stopScreenShare : openScreenPicker}
+                    title={screenSharing ? 'Parar transmissão' : 'Compartilhar tela'}
+                    aria-label={screenSharing ? 'Parar transmissão' : 'Compartilhar tela'}
+                  >
+                    <ScreenIcon />
+                  </button>
 
-              <button
-                className="voice-button leave"
-                onClick={disconnectVoice}
-              >
-                Sair da call
-              </button>
-            </div>
+                  <button
+                    className="voice-icon-button leave"
+                    onClick={disconnectVoice}
+                    title="Sair da call"
+                    aria-label="Sair da call"
+                  >
+                    <PhoneOffIcon />
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
 
-      {volumeMenu && (
-        <div
-          className="voice-context-menu"
-          style={{
-            left: volumeMenu.x,
-            top: volumeMenu.y
-          }}
-          onClick={(event) =>
-            event.stopPropagation()
-          }
-          onContextMenu={(event) =>
-            event.preventDefault()
-          }
-        >
-          <strong>{volumeMenu.label}</strong>
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} close={() => setMenu(null)}>
+          <strong>{menu.label}</strong>
 
           <span className="voice-context-label">
-            {volumeMenu.kind === 'participant'
+            {menu.kind === 'participant'
               ? 'Volume do usuário'
-              : 'Volume da transmissão'}
+              : menu.kind === 'screen'
+                ? 'Volume da transmissão'
+                : 'Ganho do seu microfone'}
           </span>
 
           <div className="voice-context-slider-row">
@@ -584,13 +561,8 @@ export function VoiceRoom(props: VoiceRoomProps) {
               max="250"
               step="1"
               value={Math.round(menuVolume * 100)}
-              onChange={(event) =>
-                updateMenuVolume(
-                  Number(event.target.value) / 100
-                )
-              }
+              onChange={(event) => updateMenuVolume(Number(event.target.value) / 100)}
             />
-
             <b>{Math.round(menuVolume * 100)}%</b>
           </div>
 
@@ -600,19 +572,43 @@ export function VoiceRoom(props: VoiceRoomProps) {
             <span>250%</span>
           </div>
 
-          <button
-            type="button"
-            onClick={() =>
-              updateMenuVolume(
-                menuVolume === 0 ? 1 : 0
-              )
-            }
-          >
-            {menuVolume === 0
-              ? 'Restaurar volume'
-              : 'Silenciar para mim'}
-          </button>
-        </div>
+          {menu.kind !== 'self' && (
+            <button
+              type="button"
+              onClick={() => updateMenuVolume(menuVolume === 0 ? 1 : 0)}
+            >
+              {menuVolume === 0 ? 'Restaurar volume' : 'Silenciar para mim'}
+            </button>
+          )}
+
+          {menu.kind === 'participant' && (
+            <button
+              type="button"
+              className="context-menu-with-icon"
+              disabled={
+                friendIds.has(menu.identity) ||
+                Boolean(menu.username && friendUsernames.has(menu.username.toLowerCase())) ||
+                !menu.username
+              }
+              onClick={async () => {
+                if (!menu.username) return
+                try {
+                  await sendFriendRequest(menu.username)
+                  setMenu(null)
+                } catch (error) {
+                  alert(error instanceof Error ? error.message : 'Não foi possível enviar o pedido.')
+                }
+              }}
+            >
+              <UserPlusIcon />
+              {friendIds.has(menu.identity) || Boolean(menu.username && friendUsernames.has(menu.username.toLowerCase()))
+                ? 'Já é seu amigo'
+                : menu.username
+                  ? 'Adicionar amigo'
+                  : 'Usuário sem nome disponível'}
+            </button>
+          )}
+        </ContextMenu>
       )}
     </section>
   )

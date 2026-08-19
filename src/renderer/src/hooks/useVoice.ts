@@ -7,7 +7,7 @@ import {
   Track
 } from 'livekit-client'
 
-import type { ConcordServer, User, VoiceParticipant } from '../types/concord'
+import type { HarmonyServer, User, VoiceParticipant } from '../types/harmony'
 import { playCallSound } from '../utils/callSounds'
 
 type ApiRequest = (endpoint: string, options?: RequestInit) => Promise<any>
@@ -27,6 +27,22 @@ type RemoteAudioPipeline = {
 }
 
 const clampVolume = (volume: number) => Math.max(0, Math.min(2.5, volume))
+const clampMicGain = (gain: number) => Math.max(0, Math.min(2.5, gain))
+
+function readJsonSetting<T>(primary: string, legacy: string, fallback: T): T {
+  try {
+    const value = localStorage.getItem(primary) ?? localStorage.getItem(legacy)
+    return value ? JSON.parse(value) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function readBooleanSetting(primary: string, legacy: string, fallback: boolean) {
+  const value = localStorage.getItem(primary) ?? localStorage.getItem(legacy)
+  if (value === null) return fallback
+  return value === 'true'
+}
 
 export function useVoice({ user, apiRequest }: UseVoiceOptions) {
   const [muted, setMuted] = useState(false)
@@ -38,21 +54,26 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
   const [connectedServerId, setConnectedServerId] = useState('')
   const [connectedChannelId, setConnectedChannelId] = useState('')
 
-  const [participantVolumes, setParticipantVolumes] = useState<Record<string, number>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('concord-participant-volumes') || '{}')
-    } catch {
-      return {}
-    }
+  const [participantVolumes, setParticipantVolumes] = useState<Record<string, number>>(() =>
+    readJsonSetting('harmony-participant-volumes', 'concord-participant-volumes', {})
+  )
+
+  const [screenShareVolumes, setScreenShareVolumes] = useState<Record<string, number>>(() =>
+    readJsonSetting('harmony-screen-volumes', 'concord-screen-volumes', {})
+  )
+
+  const [selfMicGain, setSelfMicGainState] = useState(() => {
+    const saved = Number(
+      localStorage.getItem('harmony-self-mic-gain') ??
+      localStorage.getItem('concord-self-mic-gain') ??
+      '1'
+    )
+    return Number.isFinite(saved) ? clampMicGain(saved) : 1
   })
 
-  const [screenShareVolumes, setScreenShareVolumes] = useState<Record<string, number>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('concord-screen-volumes') || '{}')
-    } catch {
-      return {}
-    }
-  })
+  const [joinMuted, setJoinMutedState] = useState(() =>
+    readBooleanSetting('harmony-join-muted', 'concord-join-muted', false)
+  )
 
   // Medidor do próprio microfone.
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -62,13 +83,21 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
   const localSpeakingRef = useRef(false)
   const lastVoiceTimeRef = useRef(0)
   const mutedRef = useRef(false)
+  const deafenedRef = useRef(false)
+  const micMutedBeforeDeafenRef = useRef(false)
 
-  // Mixer remoto. Um único AudioContext reduz custo de CPU e permite ganho > 100%.
+  // Microfone processado para permitir ganho individual do próprio usuário.
+  const micProcessContextRef = useRef<AudioContext | null>(null)
+  const micProcessSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const micProcessGainRef = useRef<GainNode | null>(null)
+  const micProcessCompressorRef = useRef<DynamicsCompressorNode | null>(null)
+  const micRawTrackRef = useRef<MediaStreamTrack | null>(null)
+
+  // Mixer remoto. O áudio de participantes e de compartilhamento é separado.
   const remoteAudioContextRef = useRef<AudioContext | null>(null)
   const remoteMasterRef = useRef<GainNode | null>(null)
   const remotePipelinesRef = useRef<Map<string, RemoteAudioPipeline>>(new Map())
   const remoteTracksRef = useRef<Map<string, RemoteAudioTrack>>(new Map())
-  const deafenedRef = useRef(false)
   const activeScreenShareIdentityRef = useRef('')
 
   useEffect(() => {
@@ -79,6 +108,18 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     deafenedRef.current = deafened
   }, [deafened])
 
+  const getParticipantFlags = useCallback((participant: RemoteParticipant) => {
+    const micPublication = participant.getTrackPublication(Track.Source.Microphone)
+    const attrs = participant.attributes ?? {}
+
+    return {
+      isMuted:
+        micPublication?.isMuted ??
+        attrs['harmony.muted'] === 'true',
+      isDeafened: attrs['harmony.deafened'] === 'true'
+    }
+  }, [])
+
   const syncVoiceParticipants = useCallback(
     (room: Room) => {
       const participants: VoiceParticipant[] = []
@@ -87,33 +128,43 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       participants.push({
         identity: local.identity,
         name: local.name || user?.displayName || 'Você',
+        username: user?.username,
         isSpeaking: localSpeakingRef.current,
         avatarUrl: user?.avatarUrl || '',
-        isLocal: true
+        isLocal: true,
+        isMuted: mutedRef.current,
+        isDeafened: deafenedRef.current
       })
 
       room.remoteParticipants.forEach((participant: RemoteParticipant) => {
         let avatarUrl = ''
+        let username = ''
 
         try {
           const metadata = participant.metadata ? JSON.parse(participant.metadata) : null
           avatarUrl = typeof metadata?.avatarUrl === 'string' ? metadata.avatarUrl : ''
+          username = typeof metadata?.username === 'string' ? metadata.username : ''
         } catch {
           avatarUrl = ''
+          username = ''
         }
+
+        const flags = getParticipantFlags(participant)
 
         participants.push({
           identity: participant.identity,
           name: participant.name || participant.identity,
+          username,
           isSpeaking: participant.isSpeaking,
           avatarUrl,
-          isLocal: false
+          isLocal: false,
+          ...flags
         })
       })
 
       setVoiceParticipants(participants)
     },
-    [user?.avatarUrl, user?.displayName]
+    [getParticipantFlags, user?.avatarUrl, user?.displayName, user?.username]
   )
 
   const updateLocalSpeaking = useCallback((room: Room, speaking: boolean) => {
@@ -135,11 +186,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       meterFrameRef.current = null
     }
 
-    try {
-      microphoneSourceRef.current?.disconnect()
-    } catch {
-      // sem ação
-    }
+    try { microphoneSourceRef.current?.disconnect() } catch {}
 
     microphoneSourceRef.current = null
     meterTrackRef.current?.stop()
@@ -212,7 +259,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
 
         analyse()
       } catch (error) {
-        console.error('Erro no medidor:', error)
+        console.error('Harmony: erro no medidor do microfone:', error)
       }
     },
     [stopLocalVoiceMeter, updateLocalSpeaking]
@@ -226,7 +273,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       remoteAudioContextRef.current = context
 
       const master = context.createGain()
-      master.gain.value = deafened ? 0 : 1
+      master.gain.value = 1
       master.connect(context.destination)
       remoteMasterRef.current = master
     }
@@ -236,9 +283,19 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     }
 
     return context
-  }, [deafened])
+  }, [])
 
-  const pipelineKey = useCallback((identity: string, source: Track.Source) => `${identity}:${source}`, [])
+  const pipelineKey = useCallback(
+    (identity: string, source: Track.Source) => `${identity}:${source}`,
+    []
+  )
+
+  const voiceOutputSuppressed = useCallback(
+    (source: Track.Source) =>
+      source === Track.Source.Microphone &&
+      deafenedRef.current,
+    []
+  )
 
   const removeRemotePipeline = useCallback(
     (identity: string, source: Track.Source) => {
@@ -273,7 +330,8 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     remoteAudioContextRef.current = null
     if (context && context.state !== 'closed') await context.close().catch(() => {})
 
-    document.querySelectorAll('audio[data-concord-audio="true"]').forEach((element) => element.remove())
+    document.querySelectorAll('audio[data-harmony-audio="true"], audio[data-concord-audio="true"]')
+      .forEach((element) => element.remove())
   }, [])
 
   const createRemotePipeline = useCallback(
@@ -285,15 +343,15 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     ) => {
       const key = pipelineKey(identity, source)
       const safeVolume = clampVolume(volume)
+      const suppressed = voiceOutputSuppressed(source)
+      const effectiveVolume = suppressed ? 0 : safeVolume
 
       remoteTracksRef.current.set(key, track)
       removeRemotePipeline(identity, source)
 
-      // LiveKit recomenda anexar faixas de áudio a um elemento de mídia. Mantemos
-      // esse caminho como reprodução principal até 100%, pois é o mais confiável
-      // com autoplay/WebRTC no Electron.
       document
         .querySelectorAll<HTMLAudioElement>(
+          `audio[data-harmony-identity="${CSS.escape(identity)}"][data-harmony-source="${source}"], ` +
           `audio[data-concord-identity="${CSS.escape(identity)}"][data-concord-source="${source}"]`
         )
         .forEach((element) => element.remove())
@@ -301,28 +359,25 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       const element = track.attach()
       element.autoplay = true
       element.preload = 'auto'
-      element.volume = Math.min(1, safeVolume)
-      element.muted = deafenedRef.current
-      element.setAttribute('data-concord-audio', 'true')
-      element.setAttribute('data-concord-identity', identity)
-      element.setAttribute('data-concord-source', source)
+      element.volume = Math.min(1, effectiveVolume)
+      element.muted = effectiveVolume === 0
+      element.setAttribute('data-harmony-audio', 'true')
+      element.setAttribute('data-harmony-identity', identity)
+      element.setAttribute('data-harmony-source', source)
       element.style.display = 'none'
       document.body.appendChild(element)
       void element.play().catch(() => {})
 
-      // Até 100% não há motivo para passar por WebAudio.
-      if (safeVolume <= 1) return
+      if (effectiveVolume <= 1) return
 
       try {
         const context = await getRemoteAudioContext()
         const master = remoteMasterRef.current
         const mediaTrack = track.mediaStreamTrack
 
-        // Se o Chromium não liberou o AudioContext, mantemos o elemento HTML em
-        // 100% em vez de deixar a call completamente silenciosa.
         if (!master || !mediaTrack || context.state !== 'running') {
           element.volume = 1
-          element.muted = deafenedRef.current
+          element.muted = false
           return
         }
 
@@ -332,7 +387,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
         const compressor = context.createDynamicsCompressor()
         const trim = context.createGain()
 
-        gain.gain.value = safeVolume
+        gain.gain.value = effectiveVolume
         compressor.threshold.value = -10
         compressor.knee.value = 18
         compressor.ratio.value = 10
@@ -345,7 +400,6 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
         compressor.connect(trim)
         trim.connect(master)
 
-        // Evita áudio duplicado: acima de 100% o WebAudio passa a ser a saída.
         element.muted = true
 
         remotePipelinesRef.current.set(key, {
@@ -357,22 +411,24 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
           trackSource: source
         })
       } catch (error) {
-        console.warn('Concord: não foi possível ativar boost de áudio:', error)
-        element.volume = 1
-        element.muted = deafenedRef.current
+        console.warn('Harmony: não foi possível ativar boost de áudio:', error)
+        element.volume = Math.min(1, effectiveVolume)
+        element.muted = effectiveVolume === 0
       }
     },
-    [getRemoteAudioContext, pipelineKey, removeRemotePipeline]
+    [getRemoteAudioContext, pipelineKey, removeRemotePipeline, voiceOutputSuppressed]
   )
 
   const applyAudioVolume = useCallback(
     (identity: string, source: Track.Source, volume: number) => {
-      const safe = clampVolume(volume)
+      const configured = clampVolume(volume)
+      const safe = voiceOutputSuppressed(source) ? 0 : configured
       const key = pipelineKey(identity, source)
       const pipeline = remotePipelinesRef.current.get(key)
       const track = remoteTracksRef.current.get(key)
       const elements = Array.from(
         document.querySelectorAll<HTMLAudioElement>(
+          `audio[data-harmony-identity="${CSS.escape(identity)}"][data-harmony-source="${source}"], ` +
           `audio[data-concord-identity="${CSS.escape(identity)}"][data-concord-source="${source}"]`
         )
       )
@@ -380,9 +436,9 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       if (safe <= 1) {
         if (pipeline) removeRemotePipeline(identity, source)
         elements.forEach((element) => {
-          element.muted = deafenedRef.current
+          element.muted = safe === 0
           element.volume = safe
-          void element.play().catch(() => {})
+          if (safe > 0) void element.play().catch(() => {})
         })
         return
       }
@@ -391,30 +447,47 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
         const now = pipeline.gain.context.currentTime
         pipeline.gain.gain.cancelScheduledValues(now)
         pipeline.gain.gain.setTargetAtTime(safe, now, 0.015)
-        elements.forEach((element) => {
-          element.muted = true
-        })
+        elements.forEach((element) => { element.muted = true })
         return
       }
 
-      // O usuário acabou de passar de 100%: cria a cadeia de boost sob demanda.
       if (track) {
         void createRemotePipeline(track, identity, source, safe)
       } else {
         elements.forEach((element) => {
           element.volume = 1
-          element.muted = deafenedRef.current
+          element.muted = false
         })
       }
     },
-    [createRemotePipeline, pipelineKey, removeRemotePipeline]
+    [createRemotePipeline, pipelineKey, removeRemotePipeline, voiceOutputSuppressed]
   )
+
+  const refreshRemoteAudioState = useCallback(() => {
+    remoteTracksRef.current.forEach((_track, key) => {
+      const screenSuffix = `:${Track.Source.ScreenShareAudio}`
+      const micSuffix = `:${Track.Source.Microphone}`
+
+      if (key.endsWith(screenSuffix)) {
+        const identity = key.slice(0, -screenSuffix.length)
+        const volume =
+          activeScreenShareIdentityRef.current === identity
+            ? (screenShareVolumes[identity] ?? 1)
+            : 0
+        applyAudioVolume(identity, Track.Source.ScreenShareAudio, volume)
+      } else if (key.endsWith(micSuffix)) {
+        const identity = key.slice(0, -micSuffix.length)
+        applyAudioVolume(identity, Track.Source.Microphone, participantVolumes[identity] ?? 1)
+      }
+    })
+  }, [applyAudioVolume, participantVolumes, screenShareVolumes])
 
   const setParticipantVolume = useCallback(
     (identity: string, volume: number) => {
       const safe = clampVolume(volume)
       setParticipantVolumes((current) => {
         const next = { ...current, [identity]: safe }
+        localStorage.setItem('harmony-participant-volumes', JSON.stringify(next))
         localStorage.setItem('concord-participant-volumes', JSON.stringify(next))
         return next
       })
@@ -429,12 +502,11 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
 
       setScreenShareVolumes((current) => {
         const next = { ...current, [identity]: safe }
+        localStorage.setItem('harmony-screen-volumes', JSON.stringify(next))
         localStorage.setItem('concord-screen-volumes', JSON.stringify(next))
         return next
       })
 
-      // O volume configurado é preservado para cada transmissão, mas somente
-      // a transmissão principal selecionada pode produzir áudio.
       applyAudioVolume(
         identity,
         Track.Source.ScreenShareAudio,
@@ -447,21 +519,150 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
   const setActiveScreenShareAudio = useCallback(
     (identity: string) => {
       activeScreenShareIdentityRef.current = identity
-
-      remoteTracksRef.current.forEach((_track, key) => {
-        const suffix = `:${Track.Source.ScreenShareAudio}`
-        if (!key.endsWith(suffix)) return
-
-        const trackIdentity = key.slice(0, -suffix.length)
-        const volume =
-          trackIdentity === identity
-            ? (screenShareVolumes[trackIdentity] ?? 1)
-            : 0
-
-        applyAudioVolume(trackIdentity, Track.Source.ScreenShareAudio, volume)
-      })
+      refreshRemoteAudioState()
     },
-    [applyAudioVolume, screenShareVolumes]
+    [refreshRemoteAudioState]
+  )
+
+  const setSelfMicGain = useCallback((value: number) => {
+    const safe = clampMicGain(value)
+    setSelfMicGainState(safe)
+    localStorage.setItem('harmony-self-mic-gain', String(safe))
+    localStorage.setItem('concord-self-mic-gain', String(safe))
+
+    const gain = micProcessGainRef.current
+    if (gain) {
+      const now = gain.context.currentTime
+      gain.gain.cancelScheduledValues(now)
+      gain.gain.setTargetAtTime(safe, now, 0.02)
+    }
+  }, [])
+
+  const setJoinMuted = useCallback((value: boolean) => {
+    setJoinMutedState(value)
+    localStorage.setItem('harmony-join-muted', String(value))
+    localStorage.setItem('concord-join-muted', String(value))
+  }, [])
+
+  const cleanupProcessedMicrophone = useCallback(async () => {
+    try { micProcessSourceRef.current?.disconnect() } catch {}
+    micProcessSourceRef.current = null
+    micProcessGainRef.current = null
+    try { micProcessCompressorRef.current?.disconnect() } catch {}
+    micProcessCompressorRef.current = null
+
+    micRawTrackRef.current?.stop()
+    micRawTrackRef.current = null
+
+    const context = micProcessContextRef.current
+    micProcessContextRef.current = null
+    if (context && context.state !== 'closed') await context.close().catch(() => {})
+  }, [])
+
+  const setupProcessedMicrophone = useCallback(
+    async (room: Room, startMuted: boolean) => {
+      await cleanupProcessedMicrophone()
+
+      try {
+        const input = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: 1
+          },
+          video: false
+        })
+
+        const rawTrack = input.getAudioTracks()[0]
+        if (!rawTrack) throw new Error('Nenhum microfone disponível.')
+
+        const context = new AudioContext({ latencyHint: 'interactive' })
+        if (context.state === 'suspended') await context.resume().catch(() => {})
+
+        const source = context.createMediaStreamSource(new MediaStream([rawTrack]))
+        const gain = context.createGain()
+        const compressor = context.createDynamicsCompressor()
+        const destination = context.createMediaStreamDestination()
+
+        gain.gain.value = selfMicGain
+        compressor.threshold.value = -8
+        compressor.knee.value = 12
+        compressor.ratio.value = 8
+        compressor.attack.value = 0.003
+        compressor.release.value = 0.16
+
+        source.connect(gain)
+        gain.connect(compressor)
+        compressor.connect(destination)
+
+        const processedTrack = destination.stream.getAudioTracks()[0]
+        const publication = await room.localParticipant.publishTrack(processedTrack, {
+          source: Track.Source.Microphone,
+          name: 'harmony-microphone'
+        })
+
+        micProcessContextRef.current = context
+        micProcessSourceRef.current = source
+        micProcessGainRef.current = gain
+        micProcessCompressorRef.current = compressor
+        micRawTrackRef.current = rawTrack
+
+        if (startMuted) {
+          rawTrack.enabled = false
+          await publication.mute()
+        } else {
+          rawTrack.enabled = true
+        }
+      } catch (error) {
+        console.warn('Harmony: ganho processado indisponível; usando microfone padrão.', error)
+        await room.localParticipant.setMicrophoneEnabled(!startMuted)
+      }
+    },
+    [cleanupProcessedMicrophone, selfMicGain]
+  )
+
+  const publishLocalState = useCallback(
+    async (room: Room, nextMuted: boolean, nextDeafened: boolean) => {
+      try {
+        await room.localParticipant.setAttributes({
+          'harmony.muted': String(nextMuted),
+          'harmony.deafened': String(nextDeafened)
+        })
+      } catch (error) {
+        console.warn('Harmony: não foi possível sincronizar estado de mute:', error)
+      }
+    },
+    []
+  )
+
+  const setMicrophoneMuted = useCallback(
+    async (room: Room, nextMuted: boolean) => {
+      const publication = room.localParticipant.getTrackPublication(Track.Source.Microphone)
+      const rawTrack = micRawTrackRef.current
+
+      if (publication) {
+        if (rawTrack) rawTrack.enabled = !nextMuted
+        if (nextMuted) await publication.mute()
+        else await publication.unmute()
+      } else {
+        await room.localParticipant.setMicrophoneEnabled(!nextMuted)
+      }
+
+      setMuted(nextMuted)
+      mutedRef.current = nextMuted
+
+      if (nextMuted) {
+        updateLocalSpeaking(room, false)
+        stopLocalVoiceMeter()
+      } else {
+        window.setTimeout(() => startLocalVoiceMeter(room), 250)
+      }
+
+      await publishLocalState(room, nextMuted, deafenedRef.current)
+      syncVoiceParticipants(room)
+    },
+    [publishLocalState, startLocalVoiceMeter, stopLocalVoiceMeter, syncVoiceParticipants, updateLocalSpeaking]
   )
 
   const disconnectVoice = useCallback(async () => {
@@ -470,6 +671,7 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     stopLocalVoiceMeter()
     if (livekitRoom) await livekitRoom.disconnect()
     await clearRemoteAudio()
+    await cleanupProcessedMicrophone()
 
     setLivekitRoom(null)
     setVoiceConnected(false)
@@ -481,19 +683,18 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     setMuted(false)
     setDeafened(false)
     mutedRef.current = false
+    deafenedRef.current = false
+    micMutedBeforeDeafenRef.current = false
 
     if (shouldPlayLeaveSound) playCallSound('leave')
-  }, [clearRemoteAudio, livekitRoom, stopLocalVoiceMeter, voiceConnected])
+  }, [clearRemoteAudio, cleanupProcessedMicrophone, livekitRoom, stopLocalVoiceMeter, voiceConnected])
 
   const connectVoice = useCallback(
-    async (server: ConcordServer, channelId?: string) => {
+    async (server: HarmonyServer, channelId?: string) => {
       if (voiceConnected || voiceConnecting) return
 
       try {
         setVoiceConnecting(true)
-
-        // A entrada na call nasce de um clique. Aproveitamos esse gesto para
-        // liberar o AudioContext antes de qualquer await de rede.
         void getRemoteAudioContext()
 
         const voiceChannel = (server.channels ?? []).find(
@@ -539,23 +740,30 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
           track.detach().forEach((element) => element.remove())
         })
 
-        room.on(RoomEvent.ParticipantConnected, () => syncVoiceParticipants(room))
-        room.on(RoomEvent.ParticipantDisconnected, () => syncVoiceParticipants(room))
-        room.on(RoomEvent.ActiveSpeakersChanged, () => syncVoiceParticipants(room))
+        const resync = () => syncVoiceParticipants(room)
+        room.on(RoomEvent.ParticipantConnected, resync)
+        room.on(RoomEvent.ParticipantDisconnected, resync)
+        room.on(RoomEvent.ActiveSpeakersChanged, resync)
+        room.on(RoomEvent.TrackMuted, resync as never)
+        room.on(RoomEvent.TrackUnmuted, resync as never)
+        room.on(RoomEvent.ParticipantAttributesChanged, resync as never)
 
         room.on(RoomEvent.Disconnected, () => {
           stopLocalVoiceMeter()
           void clearRemoteAudio()
+          void cleanupProcessedMicrophone()
           setVoiceConnected(false)
           setLivekitRoom(null)
           setVoiceParticipants([])
           setConnectedServerId('')
           setConnectedChannelId('')
-        })
+              })
 
         await room.connect(data.url, data.token)
         await room.startAudio().catch(() => {})
-        await room.localParticipant.setMicrophoneEnabled(true)
+
+        const startMuted = joinMuted
+        await setupProcessedMicrophone(room, startMuted)
 
         setLivekitRoom(room)
         setVoiceConnected(true)
@@ -563,10 +771,17 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
         setConnectedChannelId(voiceChannel?.id || '')
         playCallSound('join')
 
-        setMuted(false)
-        mutedRef.current = false
+        setMuted(startMuted)
+        mutedRef.current = startMuted
+        setDeafened(false)
+        deafenedRef.current = false
+        micMutedBeforeDeafenRef.current = false
+        await publishLocalState(room, startMuted, false)
         syncVoiceParticipants(room)
-        setTimeout(() => startLocalVoiceMeter(room), 250)
+
+        if (!startMuted) {
+          window.setTimeout(() => startLocalVoiceMeter(room), 250)
+        }
       } catch (error) {
         console.error(error)
         alert(error instanceof Error ? error.message : 'Não foi possível entrar na call.')
@@ -577,12 +792,16 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     [
       apiRequest,
       clearRemoteAudio,
+      cleanupProcessedMicrophone,
       createRemotePipeline,
       getRemoteAudioContext,
+      joinMuted,
       participantVolumes,
       pipelineKey,
+      publishLocalState,
       removeRemotePipeline,
       screenShareVolumes,
+      setupProcessedMicrophone,
       startLocalVoiceMeter,
       stopLocalVoiceMeter,
       syncVoiceParticipants,
@@ -594,42 +813,62 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
   const toggleMicrophone = useCallback(async () => {
     if (!livekitRoom) return
 
-    const newMuted = !muted
-    await livekitRoom.localParticipant.setMicrophoneEnabled(!newMuted)
+    // Como no Discord, não é possível reabrir o mic enquanto estiver ensurdecido.
+    if (deafenedRef.current && mutedRef.current) return
 
-    setMuted(newMuted)
-    mutedRef.current = newMuted
-    playCallSound(newMuted ? 'mute' : 'unmute')
+    await setMicrophoneMuted(livekitRoom, !mutedRef.current)
+  }, [livekitRoom, setMicrophoneMuted])
 
-    if (newMuted) {
-      updateLocalSpeaking(livekitRoom, false)
-      stopLocalVoiceMeter()
+  const toggleDeafen = useCallback(async () => {
+    if (!livekitRoom) return
+
+    const nextDeafened = !deafenedRef.current
+
+    if (nextDeafened) {
+      micMutedBeforeDeafenRef.current = mutedRef.current
+
+      if (!mutedRef.current) {
+        await setMicrophoneMuted(livekitRoom, true)
+      }
+
+      setDeafened(true)
+      deafenedRef.current = true
+
+      await publishLocalState(livekitRoom, mutedRef.current, true)
+      refreshRemoteAudioState()
+      syncVoiceParticipants(livekitRoom)
+      return
+    }
+
+    setDeafened(false)
+    deafenedRef.current = false
+
+    const shouldRestoreMicrophone = !micMutedBeforeDeafenRef.current
+
+    if (shouldRestoreMicrophone && mutedRef.current) {
+      await setMicrophoneMuted(livekitRoom, false)
     } else {
-      setTimeout(() => startLocalVoiceMeter(livekitRoom), 250)
-    }
-  }, [livekitRoom, muted, startLocalVoiceMeter, stopLocalVoiceMeter, updateLocalSpeaking])
-
-  const toggleDeafen = useCallback(() => {
-    const newValue = !deafened
-    setDeafened(newValue)
-    deafenedRef.current = newValue
-    playCallSound(newValue ? 'deafen' : 'undeafen')
-
-    const master = remoteMasterRef.current
-    if (master) {
-      const now = master.context.currentTime
-      master.gain.cancelScheduledValues(now)
-      master.gain.setTargetAtTime(newValue ? 0 : 1, now, 0.012)
+      await publishLocalState(livekitRoom, mutedRef.current, false)
+      syncVoiceParticipants(livekitRoom)
     }
 
-    document.querySelectorAll<HTMLAudioElement>('audio[data-concord-audio="true"]').forEach((element) => {
-      const identity = element.getAttribute('data-concord-identity') || ''
-      const source = (element.getAttribute('data-concord-source') || '') as Track.Source
-      const boosted = remotePipelinesRef.current.has(pipelineKey(identity, source))
-      element.muted = newValue || boosted
-      if (!newValue && !boosted) void element.play().catch(() => {})
-    })
-  }, [deafened, pipelineKey])
+    micMutedBeforeDeafenRef.current = false
+    refreshRemoteAudioState()
+  }, [
+    livekitRoom,
+    publishLocalState,
+    refreshRemoteAudioState,
+    setMicrophoneMuted,
+    syncVoiceParticipants
+  ])
+
+  useEffect(() => {
+    return () => {
+      stopLocalVoiceMeter()
+      void clearRemoteAudio()
+      void cleanupProcessedMicrophone()
+    }
+  }, [clearRemoteAudio, cleanupProcessedMicrophone, stopLocalVoiceMeter])
 
   return {
     muted,
@@ -642,12 +881,16 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     connectedChannelId,
     participantVolumes,
     screenShareVolumes,
-    setParticipantVolume,
-    setScreenShareVolume,
-    setActiveScreenShareAudio,
+    selfMicGain,
+    joinMuted,
     connectVoice,
     disconnectVoice,
     toggleMicrophone,
-    toggleDeafen
+    toggleDeafen,
+    setParticipantVolume,
+    setScreenShareVolume,
+    setActiveScreenShareAudio,
+    setSelfMicGain,
+    setJoinMuted
   }
 }

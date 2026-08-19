@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { FriendRequest, User } from '../../types/concord'
+import type { FriendRequest, User } from '../../types/harmony'
 import { Avatar } from '../common/Avatar'
 import { FriendCard } from './FriendCard'
 

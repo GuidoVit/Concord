@@ -4,8 +4,8 @@ export function WindowChrome() {
   const [maximized, setMaximized] = useState(false)
 
   useEffect(() => {
-    void window.concord.window.isMaximized().then(setMaximized)
-    return window.concord.window.onMaximizedChange(setMaximized)
+    void window.harmony.window.isMaximized().then(setMaximized)
+    return window.harmony.window.onMaximizedChange(setMaximized)
   }, [])
 
   return (
@@ -17,7 +17,7 @@ export function WindowChrome() {
           type="button"
           title="Minimizar"
           aria-label="Minimizar"
-          onClick={() => void window.concord.window.minimize()}
+          onClick={() => void window.harmony.window.minimize()}
         >
           <span className="window-minimize" />
         </button>
@@ -27,7 +27,7 @@ export function WindowChrome() {
           type="button"
           title={maximized ? 'Restaurar' : 'Maximizar'}
           aria-label={maximized ? 'Restaurar' : 'Maximizar'}
-          onClick={() => void window.concord.window.toggleMaximize()}
+          onClick={() => void window.harmony.window.toggleMaximize()}
         >
           <span className={maximized ? 'window-restore' : 'window-maximize'} />
         </button>
@@ -37,7 +37,7 @@ export function WindowChrome() {
           type="button"
           title="Fechar"
           aria-label="Fechar"
-          onClick={() => void window.concord.window.close()}
+          onClick={() => void window.harmony.window.close()}
         >
           <span className="window-close" />
         </button>

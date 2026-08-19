@@ -1,13 +1,13 @@
-import type { ConcordServer, Screen } from '../../types/concord'
+import type { HarmonyServer, Screen } from '../../types/harmony'
 import { Mascot } from '../common/Mascot'
 
 interface ServerRailProps {
-  servers: ConcordServer[]
-  selectedServer: ConcordServer | null
+  servers: HarmonyServer[]
+  selectedServer: HarmonyServer | null
   screen: Screen
   unreadMessages: number
   goHome: () => void
-  openServer: (server: ConcordServer) => void
+  openServer: (server: HarmonyServer) => void
   openCreateServer: () => void
   openJoinServer: () => void
 }
@@ -30,7 +30,7 @@ export function ServerRail({
         title="Mensagens diretas"
       >
         <Mascot
-          alt="Concord"
+          alt="Harmony"
           className="rail-mascot-image"
         />
 

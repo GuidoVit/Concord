@@ -14,7 +14,7 @@ export async function apiRequest(
     headers.delete('Content-Type')
   }
 
-  const savedToken = localStorage.getItem('concord_token')
+  const savedToken = localStorage.getItem('harmony_token') ?? localStorage.getItem('concord_token')
 
   if (savedToken) {
     headers.set('Authorization', `Bearer ${savedToken}`)

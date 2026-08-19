@@ -1,4 +1,4 @@
-import type { User } from '../../types/concord'
+import type { User } from '../../types/harmony'
 import { FriendCard } from '../friends/FriendCard'
 
 export function Home({

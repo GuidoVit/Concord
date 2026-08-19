@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AudioPresets,
   LocalVideoTrack,
   RemoteVideoTrack,
   Room,
@@ -12,7 +13,7 @@ import type {
   ScreenShareQuality,
   ScreenSource,
   User
-} from '../types/concord'
+} from '../types/harmony'
 
 interface UseScreenShareOptions {
   livekitRoom: Room | null
@@ -79,16 +80,13 @@ export function useScreenShare({
   const [screenShareStarting, setScreenShareStarting] = useState(false)
   const [screenShares, setScreenShares] = useState<ActiveScreenShare[]>([])
   const [selectedScreenShareIdentity, setSelectedScreenShareIdentity] = useState('')
-  const [screenQuality, setScreenQuality] = useState<ScreenShareQuality>(
-    () =>
-      (localStorage.getItem('concord-screen-quality') as ScreenShareQuality) ||
-      'balanced'
+  const [screenQuality, setScreenQuality] = useState<ScreenShareQuality>(() =>
+    ((localStorage.getItem('harmony-screen-quality') ??
+      localStorage.getItem('concord-screen-quality')) as ScreenShareQuality) ||
+    'balanced'
   )
 
-  // Mantido por compatibilidade com componentes antigos. A nova VoiceRoom
-  // cria refs próprios para a transmissão principal e para cada preview.
   const screenVideoRef = useRef<HTMLVideoElement | null>(null)
-
   const selectedIdentityRef = useRef('')
   const screenSharesRef = useRef<ActiveScreenShare[]>([])
 
@@ -107,32 +105,21 @@ export function useScreenShare({
       return
     }
 
-    const exists = screenSharesRef.current.some(
-      (share) => share.identity === identity
-    )
-
-    if (exists) {
+    if (screenSharesRef.current.some((share) => share.identity === identity)) {
       setSelectedScreenShareIdentity(identity)
     }
   }, [])
 
   const upsertShare = useCallback((share: ActiveScreenShare) => {
     setScreenShares((current) => {
-      const existingIndex = current.findIndex(
-        (item) => item.identity === share.identity
-      )
-
+      const existingIndex = current.findIndex((item) => item.identity === share.identity)
       const next =
         existingIndex === -1
           ? [...current, share]
-          : current.map((item, index) =>
-              index === existingIndex ? share : item
-            )
+          : current.map((item, index) => (index === existingIndex ? share : item))
 
       screenSharesRef.current = next
 
-      // Uma nova transmissão nunca sobrepõe automaticamente a que o usuário
-      // já estava assistindo. Ela só vira principal se não havia nenhuma.
       if (
         !selectedIdentityRef.current ||
         !next.some((item) => item.identity === selectedIdentityRef.current)
@@ -151,7 +138,10 @@ export function useScreenShare({
       const next = current.filter((share) => share.identity !== identity)
       screenSharesRef.current = next
 
-      if (selectedIdentityRef.current === identity) {
+      if (
+        selectedIdentityRef.current === identity ||
+        !next.some((share) => share.identity === selectedIdentityRef.current)
+      ) {
         const replacement = next[0]?.identity || ''
         selectedIdentityRef.current = replacement
         setSelectedScreenShareIdentity(replacement)
@@ -178,10 +168,7 @@ export function useScreenShare({
 
     const addRemoteShare = (
       track: RemoteVideoTrack,
-      participant: {
-        identity: string
-        name?: string
-      }
+      participant: { identity: string; name?: string }
     ) => {
       upsertShare({
         identity: participant.identity,
@@ -217,10 +204,7 @@ export function useScreenShare({
       }
     }
 
-    const localPublished = (publication: {
-      source: Track.Source
-      track?: unknown
-    }) => {
+    const localPublished = (publication: { source: Track.Source; track?: unknown }) => {
       if (
         publication.source === Track.Source.ScreenShare &&
         publication.track instanceof LocalVideoTrack
@@ -239,7 +223,7 @@ export function useScreenShare({
       if (publication.source === Track.Source.ScreenShare) {
         removeShare(livekitRoom.localParticipant.identity)
         setScreenSharing(false)
-      }
+        }
     }
 
     const participantDisconnected = (participant: { identity: string }) => {
@@ -252,20 +236,14 @@ export function useScreenShare({
       setShowScreenPicker(false)
     }
 
-    // Recupera transmissões já ativas quando o usuário volta de DM/outro server.
     livekitRoom.remoteParticipants.forEach((participant) => {
-      const track =
-        participant.getTrackPublication(Track.Source.ScreenShare)?.track
-
-      if (track instanceof RemoteVideoTrack) {
-        addRemoteShare(track, participant)
-      }
+      const track = participant.getTrackPublication(Track.Source.ScreenShare)?.track
+      if (track instanceof RemoteVideoTrack) addRemoteShare(track, participant)
     })
 
-    const localTrack =
-      livekitRoom.localParticipant.getTrackPublication(
-        Track.Source.ScreenShare
-      )?.track
+    const localTrack = livekitRoom.localParticipant.getTrackPublication(
+      Track.Source.ScreenShare
+    )?.track
 
     if (localTrack instanceof LocalVideoTrack) {
       upsertShare({
@@ -289,10 +267,7 @@ export function useScreenShare({
       livekitRoom.off(RoomEvent.TrackUnsubscribed, unsubscribed as never)
       livekitRoom.off(RoomEvent.LocalTrackPublished, localPublished as never)
       livekitRoom.off(RoomEvent.LocalTrackUnpublished, localUnpublished as never)
-      livekitRoom.off(
-        RoomEvent.ParticipantDisconnected,
-        participantDisconnected as never
-      )
+      livekitRoom.off(RoomEvent.ParticipantDisconnected, participantDisconnected as never)
       livekitRoom.off(RoomEvent.Disconnected, disconnected)
     }
   }, [
@@ -300,20 +275,17 @@ export function useScreenShare({
     user?.displayName,
     upsertShare,
     removeShare,
-    clearShares
+    clearShares,
   ])
 
   const selectedScreenShare = useMemo(
     () =>
-      screenShares.find(
-        (share) => share.identity === selectedScreenShareIdentity
-      ) ||
+      screenShares.find((share) => share.identity === selectedScreenShareIdentity) ||
       screenShares[0] ||
       null,
     [screenShares, selectedScreenShareIdentity]
   )
 
-  // Campos antigos continuam existindo para não quebrar outros componentes.
   const screenTrack = selectedScreenShare?.videoTrack ?? null
   const screenSharerName = selectedScreenShare?.name ?? ''
   const screenSharerIdentity = selectedScreenShare?.identity ?? ''
@@ -322,14 +294,11 @@ export function useScreenShare({
     if (!livekitRoom || !voiceConnected) return
 
     try {
-      const sources = await window.concord.screenShare.getSources()
+      const sources = await window.harmony.screenShare.getSources()
       setScreenSources(sources)
       setShowScreenPicker(true)
     } catch (error) {
-      console.error(
-        'Concord: não foi possível carregar as fontes de compartilhamento:',
-        error
-      )
+      console.error('Harmony: não foi possível carregar as fontes:', error)
     }
   }, [livekitRoom, voiceConnected])
 
@@ -346,42 +315,52 @@ export function useScreenShare({
 
       setScreenShareStarting(true)
       setScreenQuality(quality)
+      localStorage.setItem('harmony-screen-quality', quality)
       localStorage.setItem('concord-screen-quality', quality)
 
       try {
-        await window.concord.screenShare.selectSource(source.id)
+        await window.harmony.screenShare.selectSource(source.id)
 
         let publication: any
         let audioAvailable = true
 
         try {
-          // Primeira tentativa: vídeo + áudio do sistema.
-          publication =
-            await livekitRoom.localParticipant.setScreenShareEnabled(
-              true,
-              {
-                audio: true,
-                video: true,
-                contentHint: 'motion',
-                systemAudio: 'include',
-                resolution: {
-                  width: profile.width,
-                  height: profile.height,
-                  frameRate: profile.frameRate
-                }
-              },
-              {
-                simulcast: true,
-                screenShareEncoding: {
-                  maxBitrate: profile.maxBitrate,
-                  maxFramerate: profile.frameRate,
-                  priority: 'high'
-                }
+          publication = await livekitRoom.localParticipant.setScreenShareEnabled(
+            true,
+            {
+              audio: true,
+              video: true,
+              contentHint: 'motion',
+              systemAudio: 'include',
+              resolution: {
+                width: profile.width,
+                height: profile.height,
+                frameRate: profile.frameRate
               }
-            )
+            },
+            {
+              simulcast: true,
+
+              /*
+               * Áudio de compartilhamento é mídia, não microfone.
+               * O preset estéreo de alta qualidade preserva melhor música,
+               * jogos, filmes e trechos complexos como refrões.
+               */
+              audioPreset: AudioPresets.musicHighQualityStereo,
+              forceStereo: true,
+              dtx: false,
+              red: true,
+
+              screenShareEncoding: {
+                maxBitrate: profile.maxBitrate,
+                maxFramerate: profile.frameRate,
+                priority: 'high'
+              }
+            }
+          )
         } catch (audioError) {
           console.warn(
-            'Concord: áudio do compartilhamento indisponível. Tentando somente vídeo.',
+            'Harmony: áudio do sistema indisponível. Tentando somente vídeo.',
             audioError
           )
 
@@ -389,33 +368,29 @@ export function useScreenShare({
 
           try {
             await livekitRoom.localParticipant.setScreenShareEnabled(false)
-          } catch {
-            // A primeira tentativa pode falhar antes de publicar.
-          }
+          } catch {}
 
-          // Fallback: o compartilhamento continua somente com vídeo.
-          publication =
-            await livekitRoom.localParticipant.setScreenShareEnabled(
-              true,
-              {
-                audio: false,
-                video: true,
-                contentHint: 'motion',
-                resolution: {
-                  width: profile.width,
-                  height: profile.height,
-                  frameRate: profile.frameRate
-                }
-              },
-              {
-                simulcast: true,
-                screenShareEncoding: {
-                  maxBitrate: profile.maxBitrate,
-                  maxFramerate: profile.frameRate,
-                  priority: 'high'
-                }
+          publication = await livekitRoom.localParticipant.setScreenShareEnabled(
+            true,
+            {
+              audio: false,
+              video: true,
+              contentHint: 'motion',
+              resolution: {
+                width: profile.width,
+                height: profile.height,
+                frameRate: profile.frameRate
               }
-            )
+            },
+            {
+              simulcast: true,
+              screenShareEncoding: {
+                maxBitrate: profile.maxBitrate,
+                maxFramerate: profile.frameRate,
+                priority: 'high'
+              }
+            }
+          )
         }
 
         const localIdentity = livekitRoom.localParticipant.identity
@@ -434,8 +409,6 @@ export function useScreenShare({
             isLocal: true
           })
 
-          // Quem começou a compartilhar passa a ver a própria tela como
-          // principal, sem alterar a seleção dos outros participantes.
           selectedIdentityRef.current = localIdentity
           setSelectedScreenShareIdentity(localIdentity)
         }
@@ -451,24 +424,17 @@ export function useScreenShare({
           }, 150)
         }
       } catch (error) {
-        console.error(
-          'Concord: erro ao iniciar compartilhamento:',
-          error
-        )
+        console.error('Harmony: erro ao iniciar compartilhamento:', error)
 
         try {
           await livekitRoom.localParticipant.setScreenShareEnabled(false)
-        } catch {
-          // Ignora.
-        }
+        } catch {}
 
         try {
-          await window.concord.screenShare.clearSource()
-        } catch {
-          // Ignora.
-        }
+          await window.harmony.screenShare.clearSource()
+        } catch {}
 
-        removeShare(livekitRoom.localParticipant.identity)
+          removeShare(livekitRoom.localParticipant.identity)
         setScreenSharing(false)
 
         alert(
@@ -496,10 +462,8 @@ export function useScreenShare({
       await livekitRoom.localParticipant.setScreenShareEnabled(false)
     } finally {
       try {
-        await window.concord.screenShare.clearSource()
-      } catch {
-        // Ignora.
-      }
+        await window.harmony.screenShare.clearSource()
+      } catch {}
 
       removeShare(livekitRoom.localParticipant.identity)
       setScreenSharing(false)
@@ -510,16 +474,12 @@ export function useScreenShare({
     if (livekitRoom && screenSharing) {
       try {
         await livekitRoom.localParticipant.setScreenShareEnabled(false)
-      } catch {
-        // Ignora.
-      }
+      } catch {}
     }
 
     try {
-      await window.concord.screenShare.clearSource()
-    } catch {
-      // Ignora.
-    }
+      await window.harmony.screenShare.clearSource()
+    } catch {}
 
     setScreenSharing(false)
     clearShares()
@@ -530,22 +490,16 @@ export function useScreenShare({
     screenSources,
     showScreenPicker,
     setShowScreenPicker,
-
     screenSharing,
     screenShareStarting,
-
     screenShares,
     selectedScreenShareIdentity,
     selectScreenShare,
-
-    // Compatibilidade
     screenTrack,
     screenSharerName,
     screenSharerIdentity,
-
     screenQuality,
     screenVideoRef,
-
     openScreenPicker,
     startScreenShare,
     stopScreenShare,

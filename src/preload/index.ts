@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-contextBridge.exposeInMainWorld('concord', {
-  version: '1.1.0',
+const harmonyApi = {
+  version: '1.2.0',
 
   screenShare: {
     getSources: () => ipcRenderer.invoke('concord:get-screen-sources'),
@@ -21,6 +21,12 @@ contextBridge.exposeInMainWorld('concord', {
     }
   },
 
+  compatibility: {
+    getVideoMode: () => ipcRenderer.invoke('concord:compatibility:get-video-mode'),
+    setVideoMode: (enabled: boolean) => ipcRenderer.invoke('concord:compatibility:set-video-mode', enabled),
+    relaunch: () => ipcRenderer.invoke('concord:compatibility:relaunch')
+  },
+
   updater: {
     getState: () => ipcRenderer.invoke('concord:update:get-state'),
     check: () => ipcRenderer.invoke('concord:update:check'),
@@ -32,4 +38,8 @@ contextBridge.exposeInMainWorld('concord', {
       return () => ipcRenderer.removeListener('concord:update-state', listener)
     }
   }
-})
+}
+
+contextBridge.exposeInMainWorld('harmony', harmonyApi)
+// Alias legado para que versões/componentes antigos continuem funcionando.
+contextBridge.exposeInMainWorld('concord', harmonyApi)

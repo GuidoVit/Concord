@@ -1,5 +1,5 @@
 import { API } from '../config/api'
-import type { AttachmentKind, MessageAttachment } from '../types/concord'
+import type { AttachmentKind, MessageAttachment } from '../types/harmony'
 
 const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
 
@@ -27,13 +27,13 @@ export async function fileToAttachment(file: File): Promise<MessageAttachment> {
   }
 
   const kind = detectKind(file)
-  const token = localStorage.getItem('concord_token')
+  const token = localStorage.getItem('harmony_token') ?? localStorage.getItem('concord_token')
 
   const headers = new Headers({
     'Content-Type': 'application/octet-stream',
-    'X-Concord-File-Name': encodeURIComponent(file.name),
-    'X-Concord-File-Type': file.type || 'application/octet-stream',
-    'X-Concord-File-Kind': kind
+    'X-Harmony-File-Name': encodeURIComponent(file.name),
+    'X-Harmony-File-Type': file.type || 'application/octet-stream',
+    'X-Harmony-File-Kind': kind
   })
 
   if (token) {

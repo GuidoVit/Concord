@@ -1,23 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { UpdaterState as ConcordUpdaterState } from '../types/concord'
+import type { UpdaterState as HarmonyUpdaterState } from '../types/harmony'
 
-const initialState: ConcordUpdaterState = {
+const initialState: HarmonyUpdaterState = {
   status: 'idle',
-  currentVersion: window.concord?.version || '1.0.0'
+  currentVersion: window.harmony?.version || '1.0.0'
 }
 
 export function useUpdater() {
-  const [state, setState] = useState<ConcordUpdaterState>(initialState)
+  const [state, setState] = useState<HarmonyUpdaterState>(initialState)
   const [dismissedVersion, setDismissedVersion] = useState('')
 
   useEffect(() => {
     let mounted = true
 
-    void window.concord.updater.getState().then((next) => {
+    void window.harmony.updater.getState().then((next) => {
       if (mounted) setState(next)
     })
 
-    const unsubscribe = window.concord.updater.onState((next) => {
+    const unsubscribe = window.harmony.updater.onState((next) => {
       setState(next)
       if (next.availableVersion && next.availableVersion !== dismissedVersion) {
         setDismissedVersion('')
@@ -30,9 +30,9 @@ export function useUpdater() {
     }
   }, [dismissedVersion])
 
-  const check = useCallback(() => window.concord.updater.check(), [])
-  const download = useCallback(() => window.concord.updater.download(), [])
-  const install = useCallback(() => window.concord.updater.install(), [])
+  const check = useCallback(() => window.harmony.updater.check(), [])
+  const download = useCallback(() => window.harmony.updater.download(), [])
+  const install = useCallback(() => window.harmony.updater.install(), [])
   const dismiss = useCallback(() => {
     if (state.availableVersion) setDismissedVersion(state.availableVersion)
   }, [state.availableVersion])

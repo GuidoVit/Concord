@@ -18,7 +18,8 @@
   --mint-dark: #109c7d;
   --mint-rgb: 39, 224, 179;
 
-  --concord-gradient: linear-gradient(135deg, var(--solar), var(--mint));
+  --harmony-gradient: linear-gradient(135deg, var(--solar), var(--mint));
+  --concord-gradient: var(--harmony-gradient);
 
   --white: #f6f7f4;
   --text: #d7dcd8;

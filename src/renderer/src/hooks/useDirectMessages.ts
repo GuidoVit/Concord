@@ -6,7 +6,7 @@ import type {
   MessageAttachment,
   Screen,
   User
-} from '../types/concord'
+} from '../types/harmony'
 import { apiRequest } from '../services/apiClient'
 
 export function useDirectMessages({
@@ -37,7 +37,7 @@ export function useDirectMessages({
   }, [selectedFriend])
 
   const loadConversations = useCallback(async () => {
-    if (!localStorage.getItem('concord_token')) return
+    if (!(localStorage.getItem('harmony_token') ?? localStorage.getItem('concord_token'))) return
 
     try {
       const data = await apiRequest('/messages')

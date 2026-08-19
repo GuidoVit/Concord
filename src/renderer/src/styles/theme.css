@@ -1,7 +1,8 @@
 :root {
   --mint-rgb: 39, 224, 179;
   --solar-rgb: 246, 201, 69;
-  --concord-gradient: linear-gradient(135deg, var(--solar), var(--mint));
+  --harmony-gradient: linear-gradient(135deg, var(--solar), var(--mint));
+  --concord-gradient: var(--harmony-gradient);
 }
 
 .appearance-settings {
@@ -118,7 +119,7 @@
 .palette-preview-gradient {
   position: absolute;
   inset: 0;
-  background: var(--concord-gradient);
+  background: var(--harmony-gradient);
   opacity: .82;
 }
 

@@ -1,5 +1,5 @@
 import { API } from '../../config/api'
-import type { MessageAttachment } from '../../types/concord'
+import type { MessageAttachment } from '../../types/harmony'
 
 function attachmentSource(attachment: MessageAttachment): string {
   if (attachment.url) {

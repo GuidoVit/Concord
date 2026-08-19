@@ -9,7 +9,7 @@ interface MascotProps {
   className?: string
 }
 
-const SOURCE = './concord-mascot.png'
+const SOURCE = './concord-mascot.png' // arquivo legado; mantém compatibilidade com instalações existentes
 const DEFAULT_PRIMARY = '#27e0b3'
 const DEFAULT_SECONDARY = '#f6c945'
 
@@ -542,7 +542,7 @@ async function buildMascot(
 }
 
 export function Mascot({
-  alt = 'Concord',
+  alt = 'Harmony',
   className
 }: MascotProps) {
   const [
@@ -597,16 +597,14 @@ export function Mascot({
 
         const nextPrimary =
           primary ||
-          localStorage.getItem(
-            'concord-theme-primary'
-          ) ||
+          localStorage.getItem('harmony-theme-primary') ||
+          localStorage.getItem('concord-theme-primary') ||
           DEFAULT_PRIMARY
 
         const nextSecondary =
           secondary ||
-          localStorage.getItem(
-            'concord-theme-secondary'
-          ) ||
+          localStorage.getItem('harmony-theme-secondary') ||
+          localStorage.getItem('concord-theme-secondary') ||
           DEFAULT_SECONDARY
 
         try {
@@ -664,7 +662,7 @@ export function Mascot({
     void refresh()
 
     window.addEventListener(
-      'concord-theme-change',
+      'harmony-theme-change',
       onThemeChange
     )
 
@@ -675,7 +673,7 @@ export function Mascot({
       generationRef.current++
 
       window.removeEventListener(
-        'concord-theme-change',
+        'harmony-theme-change',
         onThemeChange
       )
 

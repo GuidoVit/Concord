@@ -1,0 +1,832 @@
+/* =========================================================
+   HARMONY 1.2 — grande update
+   Camada final de layout/voz/contextos para evitar conflitos
+   com estilos antigos enquanto o projeto é refatorado.
+   ========================================================= */
+
+:root {
+  --harmony-gradient: linear-gradient(135deg, var(--solar), var(--mint));
+  --concord-gradient: var(--harmony-gradient); /* compatibilidade de tema antigo */
+}
+
+/* ---------- Menus de contexto ---------- */
+.harmony-context-menu,
+.voice-context-menu {
+  position: fixed;
+  z-index: 14000;
+  width: min(278px, calc(100vw - 24px));
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(12, 16, 19, .985);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, .58);
+  backdrop-filter: blur(18px);
+  -webkit-app-region: no-drag;
+}
+
+.harmony-context-menu > strong,
+.voice-context-menu > strong {
+  display: block;
+  padding: 2px 2px 7px;
+  overflow: hidden;
+  color: var(--white);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.harmony-context-menu button,
+.voice-context-menu button {
+  width: 100%;
+  min-height: 34px;
+  margin-top: 5px;
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+}
+
+.harmony-context-menu button:hover:not(:disabled),
+.voice-context-menu button:hover:not(:disabled) {
+  color: var(--white);
+  border-color: rgba(var(--mint-rgb), .18);
+  background: rgba(var(--mint-rgb), .07);
+}
+
+.harmony-context-menu button:disabled,
+.voice-context-menu button:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.harmony-context-menu svg,
+.voice-context-menu svg,
+.context-menu-with-icon svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+}
+
+/* ---------- Presença de voz na sidebar ---------- */
+.voice-channel-block {
+  width: 100%;
+}
+
+.voice-channel-block .channel-row {
+  width: 100%;
+}
+
+.channel-live {
+  min-width: 18px;
+  margin-left: auto;
+  color: var(--mint);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.channel-call-time {
+  margin-left: 5px;
+  color: var(--dim);
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.channel-participants {
+  margin: 3px 0 5px;
+  padding-left: 19px;
+}
+
+.channel-participant {
+  min-height: 31px;
+  gap: 7px;
+  padding: 2px 6px;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.channel-participant .avatar,
+.channel-participant .avatar-fallback {
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+}
+
+.channel-participant .voice-mini-state {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  color: #ff717a;
+}
+
+.channel-participant .voice-mini-state svg {
+  width: 12px;
+  height: 12px;
+}
+
+.channel-participant.speaking {
+  color: var(--white);
+  background: rgba(var(--mint-rgb), .04);
+}
+
+/* ---------- Cronômetro ---------- */
+.call-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 720;
+  font-variant-numeric: tabular-nums;
+}
+
+.call-timer::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mint);
+  box-shadow: 0 0 8px rgba(var(--mint-rgb), .6);
+}
+
+/* ---------- Call: base ---------- */
+.voice-room {
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.voice-center {
+  min-width: 0;
+  max-height: 100%;
+}
+
+.voice-center.has-screen-shares {
+  width: min(1180px, calc(100% - 34px));
+  height: min(820px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin: auto;
+}
+
+/* ---------- Múltiplos compartilhamentos ---------- */
+.screen-share-layout {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-height: calc(100% - 190px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 0 auto 12px;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.screen-share-layout.with-rail {
+  grid-template-columns: minmax(0, 1fr) 188px;
+}
+
+.screen-share-stage {
+  min-width: 0;
+  min-height: 260px;
+  height: 100%;
+  max-height: 620px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #050708;
+  cursor: zoom-in;
+  user-select: none;
+}
+
+.screen-share-head {
+  min-height: 43px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border-soft);
+  background: rgba(10, 14, 16, .96);
+}
+
+.screen-share-head > div:first-child {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.screen-share-head strong {
+  overflow: hidden;
+  color: var(--white);
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.screen-share-head span {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.screen-share-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.screen-share-viewport {
+  min-height: 0;
+  flex: 1;
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #020303;
+}
+
+.screen-share-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: center center;
+  transition: transform 70ms linear;
+}
+
+.screen-zoom-indicator {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 5px 7px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 7px;
+  color: rgba(255,255,255,.82);
+  background: rgba(0,0,0,.58);
+  font-size: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+
+.screen-share-stage:hover .screen-zoom-indicator {
+  opacity: 1;
+}
+
+.screen-zoom-indicator svg {
+  width: 12px;
+  height: 12px;
+}
+
+.screen-share-rail {
+  min-width: 0;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+.screen-share-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.screen-share-preview-card {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  color: var(--muted);
+  background: rgba(255,255,255,.018);
+  text-align: left;
+}
+
+.screen-share-preview-card:hover,
+.screen-share-preview-card.selected {
+  border-color: rgba(var(--mint-rgb), .42);
+  background: rgba(var(--mint-rgb), .055);
+}
+
+.screen-share-preview-frame {
+  aspect-ratio: 16 / 9;
+  position: relative;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #020303;
+}
+
+.screen-share-preview-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.screen-share-number {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: #fff;
+  background: rgba(0,0,0,.66);
+  font-size: 7px;
+  font-weight: 900;
+}
+
+.screen-share-preview-name {
+  min-width: 0;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.screen-share-preview-name span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 8px;
+}
+
+.screen-share-preview-name b {
+  color: var(--mint);
+  font-size: 6px;
+  letter-spacing: .5px;
+}
+
+/* Corrige o deslocamento para a esquerda após uma rail desaparecer. */
+.screen-share-layout:not(.with-rail) {
+  grid-template-columns: minmax(0, 1fr) !important;
+  padding-right: 0 !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* ---------- Modo foco ---------- */
+.voice-room.share-focus-mode {
+  background: #020303;
+}
+
+.voice-room.share-focus-mode .voice-center,
+.voice-room.share-focus-mode .voice-center.has-screen-shares {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  margin: 0;
+}
+
+.voice-room.share-focus-mode .screen-share-layout {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+}
+
+.voice-room.share-focus-mode .screen-share-stage {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  cursor: zoom-out;
+}
+
+.voice-room.share-focus-mode .screen-share-head {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: min(520px, calc(100% - 30px));
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  background: rgba(7, 10, 12, .78);
+  opacity: .15;
+  transition: opacity .15s ease;
+}
+
+.voice-room.share-focus-mode .screen-share-stage:hover .screen-share-head {
+  opacity: 1;
+}
+
+/* ---------- Cards de participantes e status ---------- */
+.voice-participant-grid {
+  margin-top: 8px;
+}
+
+.voice-person {
+  position: relative;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.voice-person.muted-participant {
+  border-color: rgba(255, 78, 89, .72) !important;
+  box-shadow: 0 0 0 1px rgba(255, 78, 89, .20), inset 0 0 22px rgba(255, 78, 89, .025) !important;
+}
+
+.voice-person.muted-participant.speaking {
+  border-color: rgba(255, 78, 89, .72) !important;
+  box-shadow: 0 0 0 1px rgba(255, 78, 89, .20) !important;
+}
+
+.voice-avatar-wrap {
+  width: fit-content;
+  margin: 0 auto;
+  position: relative;
+}
+
+.voice-status-icon {
+  position: absolute;
+  right: -5px;
+  bottom: -3px;
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #101417;
+  border-radius: 50%;
+  color: #fff;
+  background: #e84852;
+  box-shadow: 0 4px 12px rgba(0,0,0,.38);
+}
+
+.voice-status-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ---------- Botões da call por ícones ---------- */
+.voice-controls.icon-controls {
+  margin-top: 13px;
+  gap: 8px;
+}
+
+.voice-icon-button {
+  width: 43px;
+  height: 43px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--text);
+  background: var(--panel);
+  transition: transform .12s ease, background .12s ease, color .12s ease, border-color .12s ease;
+}
+
+.voice-icon-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  color: var(--white);
+  border-color: rgba(var(--mint-rgb), .28);
+  background: var(--panel-2);
+}
+
+.voice-icon-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.voice-icon-button.off {
+  color: #ff747d;
+  border-color: rgba(255, 78, 89, .30);
+  background: rgba(255, 78, 89, .08);
+}
+
+.voice-icon-button.screen-active {
+  color: #07120f;
+  border-color: var(--mint);
+  background: var(--mint);
+}
+
+.voice-icon-button.leave {
+  color: #fff;
+  border-color: rgba(255, 78, 89, .42);
+  background: #d8424c;
+}
+
+.voice-icon-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* ---------- Volume M2 ---------- */
+.voice-context-label {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .55px;
+  text-transform: uppercase;
+}
+
+.voice-context-slider-row {
+  margin-top: 7px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 45px;
+  align-items: center;
+  gap: 8px;
+}
+
+.voice-context-slider-row input {
+  width: 100%;
+  accent-color: var(--mint);
+}
+
+.voice-context-slider-row b {
+  color: var(--white);
+  font-size: 9px;
+  text-align: right;
+}
+
+.voice-context-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  color: var(--dim);
+  font-size: 7px;
+}
+
+/* ---------- Configurações de chamada ---------- */
+.settings-subsection.call-settings-section {
+  margin-top: 16px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.compact-heading {
+  margin-bottom: 8px !important;
+}
+
+.settings-toggle-row {
+  min-height: 52px;
+  margin-top: 7px;
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: rgba(255,255,255,.018);
+  cursor: pointer;
+}
+
+.settings-toggle-row > div {
+  min-width: 0;
+}
+
+.settings-toggle-row strong,
+.settings-toggle-row span {
+  display: block;
+}
+
+.settings-toggle-row strong {
+  color: var(--text);
+  font-size: 10px;
+}
+
+.settings-toggle-row span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+.settings-toggle-row input[type='checkbox'] {
+  width: 34px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--mint);
+}
+
+.compatibility-restart {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(var(--solar-rgb), .32);
+  border-radius: 9px;
+  color: var(--solar);
+  background: rgba(var(--solar-rgb), .055);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+/* ---------- Mensagem rápida ---------- */
+.quick-message-textarea {
+  width: 100%;
+  min-height: 110px;
+  max-height: 240px;
+  resize: vertical;
+  margin: 8px 0 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  color: var(--text);
+  background: var(--bg-soft);
+  font: inherit;
+}
+
+.quick-message-textarea:focus {
+  border-color: rgba(var(--mint-rgb), .55);
+}
+
+/* ---------- Responsivo ---------- */
+@media (max-width: 1050px) {
+  .voice-center.has-screen-shares {
+    width: calc(100% - 18px);
+  }
+
+  .screen-share-layout.with-rail {
+    grid-template-columns: minmax(0, 1fr) 148px;
+  }
+}
+
+@media (max-width: 760px) {
+  .screen-share-layout.with-rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .screen-share-rail {
+    max-height: none;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .screen-share-preview-card {
+    width: 140px;
+    flex: 0 0 140px;
+  }
+}
+
+/* Ajustes de integração com os nomes de classes atuais. */
+.call-life {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+.channel-live .call-life {
+  color: var(--dim);
+}
+
+.channel-participant-muted {
+  margin-left: auto;
+  color: #ff717a;
+  font-size: 10px;
+}
+
+.quick-message-form textarea {
+  width: 100%;
+  min-height: 110px;
+  max-height: 240px;
+  resize: vertical;
+  margin: 8px 0 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  color: var(--text);
+  background: var(--bg-soft);
+  font: inherit;
+}
+
+.quick-message-form textarea:focus {
+  border-color: rgba(var(--mint-rgb), .55);
+}
+
+
+/* =========================================================
+   CALL — dois indicadores: microfone + áudio/deafen
+   ========================================================= */
+
+.voice-status-icons {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 5px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.voice-status-icons .voice-status-icon {
+  position: static;
+  right: auto;
+  bottom: auto;
+  flex: 0 0 auto;
+}
+
+.voice-status-icon-audio {
+  background: #e44855;
+}
+
+/* Se mic + áudio estiverem mutados, os dois ficam visíveis sem se sobrepor. */
+
+
+/* =========================================================
+   CALL — POSIÇÃO FINAL DOS INDICADORES
+   Mic mutado: posição original, inferior direito.
+   Áudio/deafen: superior esquerdo.
+   ========================================================= */
+
+.voice-status-icons {
+  position: absolute;
+  inset: 0;
+  display: block;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.voice-status-icons .voice-status-icon {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  left: auto;
+  top: auto;
+  margin: 0;
+}
+
+.voice-status-icons .voice-status-icon.voice-status-icon-audio {
+  left: -8px;
+  top: -8px;
+  right: auto;
+  bottom: auto;
+}
+
+/* Mantém os badges ancorados à própria foto/avatar. */
+.voice-avatar {
+  position: relative;
+}
+
+
+/* =========================================================
+   CALL — AJUSTE FINO DO ÍCONE DE MICROFONE
+   Mantém o mic no canto inferior direito, porém um pouco
+   sobreposto à foto/avatar, como o badge de áudio.
+   ========================================================= */
+
+.voice-status-icons .voice-status-icon:not(.voice-status-icon-audio) {
+  right: -2px;
+  bottom: -2px;
+}
+
+
+/* =========================================================
+   CALL — POSIÇÃO DO MICROFONE AJUSTADA
+   Mais para cima e para dentro da foto, mantendo o canto
+   inferior direito, como na referência desejada.
+   ========================================================= */
+
+.voice-status-icons .voice-status-icon:not(.voice-status-icon-audio) {
+  right: 6px;
+  bottom: 7px;
+}
+
+
+/* =========================================================
+   CALL — POSIÇÃO DO MICROFONE V3
+   Mantém a posição horizontal original e sobe apenas o badge,
+   para ele sobrepor um pouco a foto sem entrar demais nela.
+   ========================================================= */
+
+.voice-status-icons .voice-status-icon:not(.voice-status-icon-audio) {
+  right: -8px;
+  bottom: 3px;
+}

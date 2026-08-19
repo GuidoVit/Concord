@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import type { ScreenShareQuality, ScreenSource } from '../../types/concord'
+import type { ScreenShareQuality, ScreenSource } from '../../types/harmony'
 import { SCREEN_SHARE_PROFILES } from '../../hooks/useScreenShare'
 import { Modal } from '../common/Modal'
 
 interface Props { sources: ScreenSource[]; starting: boolean; close: () => void; start: (source: ScreenSource, quality: ScreenShareQuality) => void }
 export function ScreenSharePicker({ sources, starting, close, start }: Props) {
-  const [quality, setQuality] = useState<ScreenShareQuality>(() => (localStorage.getItem('concord-screen-quality') as ScreenShareQuality) || 'balanced')
+  const [quality, setQuality] = useState<ScreenShareQuality>(() => ((localStorage.getItem('harmony-screen-quality') ?? localStorage.getItem('concord-screen-quality')) as ScreenShareQuality) || 'balanced')
   return <Modal title="O que você quer compartilhar?" close={close}>
     <p>Escolha uma tela, janela ou jogo.</p>
     <div className="screen-quality-picker"><span>Qualidade</span><div className="quality-options">{SCREEN_SHARE_PROFILES.map((profile) => <button key={profile.id} type="button" className={quality === profile.id ? 'quality-option active' : 'quality-option'} onClick={() => setQuality(profile.id)}><strong>{profile.label}</strong><small>{profile.detail}</small></button>)}</div></div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent, RefObject } from 'react'
-import type { DirectMessage, MessageAttachment, User } from '../../types/concord'
+import type { DirectMessage, MessageAttachment, User } from '../../types/harmony'
 import { fileToAttachment } from '../../utils/media'
 import { Avatar } from '../common/Avatar'
 import { MessageAttachmentView } from '../common/MessageAttachmentView'

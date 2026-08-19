@@ -4,12 +4,12 @@ export function Logo() {
   return (
     <div className="logo">
       <div className="logo-mascot">
-        <Mascot alt="Mascote Concord" />
+        <Mascot alt="Mascote Harmony" />
       </div>
 
       <div>
         <strong>
-          Concord
+          Harmony
         </strong>
 
         <span>

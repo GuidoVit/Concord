@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
 
-import type { AuthMode } from '../../types/concord'
+import type { AuthMode } from '../../types/harmony'
 import { Field } from '../common/Field'
 import { Logo } from '../common/Logo'
 import { Mascot } from '../common/Mascot'
@@ -51,13 +51,13 @@ export function AuthScreen({
       <main className="auth-main">
         <section className="auth-card">
           <div className="auth-mascot">
-            <Mascot alt="Concord" />
+            <Mascot alt="Harmony" />
           </div>
 
           <h1>
             {authMode === 'login'
               ? 'Bem-vindo de volta'
-              : 'Crie seu Concord'}
+              : 'Crie seu Harmony'}
           </h1>
 
           <p>

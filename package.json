@@ -1,7 +1,7 @@
 {
-  "name": "concord",
-  "version": "1.1.2",
-  "description": "Concord - chat, servidores, chamadas de voz, compartilhamento de tela e atualizações automáticas",
+  "name": "harmony",
+  "version": "1.2.0",
+  "description": "Harmony - chat, servidores, chamadas de voz, compartilhamento de tela e atualizações automáticas",
   "main": "./out/main/index.js",
   "author": "Vitor Kallas",
   "homepage": "https://electron-vite.org",
@@ -29,11 +29,11 @@
     "bcryptjs": "^3.0.3",
     "concurrently": "^10.0.5",
     "dotenv": "^17.4.2",
-    "electron-updater": "^6.8.9",
     "fastify": "^5.12.0",
     "jsonwebtoken": "^9.0.3",
     "livekit-client": "^2.22.0",
-    "livekit-server-sdk": "^2.17.0"
+    "livekit-server-sdk": "^2.17.0",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",

@@ -381,7 +381,7 @@
   }
 }
 
-/* ===== Concord: qualidade e áudio da transmissão ===== */
+/* ===== Harmony: qualidade e áudio da transmissão ===== */
 .screen-quality-picker { margin:14px 0 4px; }
 .screen-quality-picker > span { display:block; margin-bottom:7px; color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; }
 .quality-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }

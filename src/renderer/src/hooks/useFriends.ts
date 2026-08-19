@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import type { FriendRequest, User } from '../types/concord'
+import type { FriendRequest, User } from '../types/harmony'
 import { apiRequest } from '../services/apiClient'
 
 export function useFriends() {

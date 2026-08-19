@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react'
-import type { ConcordServer } from '../types/concord'
+import type { HarmonyServer } from '../types/harmony'
 import { apiRequest } from '../services/apiClient'
 
 export function useServers() {
-  const [servers, setServers] = useState<ConcordServer[]>([])
-  const [selectedServer, setSelectedServer] = useState<ConcordServer | null>(null)
+  const [servers, setServers] = useState<HarmonyServer[]>([])
+  const [selectedServer, setSelectedServer] = useState<HarmonyServer | null>(null)
   const [showCreateServer, setShowCreateServer] = useState(false)
   const [showJoinServer, setShowJoinServer] = useState(false)
   const [newServerName, setNewServerName] = useState('')
@@ -32,7 +32,7 @@ export function useServers() {
     setShowCreateServer(false)
     await loadServers()
     setSelectedServer(data.server)
-    return data.server as ConcordServer
+    return data.server as HarmonyServer
   }, [newServerName, loadServers])
 
   const joinServer = useCallback(async () => {
@@ -48,7 +48,7 @@ export function useServers() {
     setShowJoinServer(false)
     await loadServers()
     setSelectedServer(data.server)
-    return data.server as ConcordServer
+    return data.server as HarmonyServer
   }, [inviteCode, loadServers])
 
   const copyInvite = useCallback(async () => {
@@ -56,7 +56,7 @@ export function useServers() {
     await navigator.clipboard.writeText(selectedServer.inviteCode)
   }, [selectedServer])
 
-  const updateServer = useCallback((nextServer: ConcordServer) => {
+  const updateServer = useCallback((nextServer: HarmonyServer) => {
     setSelectedServer(nextServer)
     setServers((current) =>
       current.map((item) => item.id === nextServer.id ? nextServer : item)

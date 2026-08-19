@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import electronUpdater, { type AppUpdater, type ProgressInfo, type UpdateInfo } from 'electron-updater'
 
-export type ConcordUpdaterState = {
+export type HarmonyUpdaterState = {
   status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'up-to-date' | 'error'
   currentVersion: string
   availableVersion?: string
@@ -12,10 +12,13 @@ export type ConcordUpdaterState = {
   error?: string
 }
 
-const state: ConcordUpdaterState = {
+const state: HarmonyUpdaterState = {
   status: 'idle',
   currentVersion: app.getVersion()
 }
+
+let initialCheckTimer: ReturnType<typeof setTimeout> | null = null
+let periodicCheckTimer: ReturnType<typeof setInterval> | null = null
 
 function getUpdater(): AppUpdater {
   const { autoUpdater } = electronUpdater
@@ -28,7 +31,7 @@ function broadcast(): void {
   }
 }
 
-function setState(patch: Partial<ConcordUpdaterState>): void {
+function setState(patch: Partial<HarmonyUpdaterState>): void {
   Object.assign(state, patch)
   broadcast()
 }
@@ -126,18 +129,34 @@ export function registerUpdaterHandlers(): void {
   })
 }
 
+export function stopUpdateChecks(): void {
+  if (initialCheckTimer) {
+    clearTimeout(initialCheckTimer)
+    initialCheckTimer = null
+  }
+
+  if (periodicCheckTimer) {
+    clearInterval(periodicCheckTimer)
+    periodicCheckTimer = null
+  }
+}
+
 export function scheduleUpdateChecks(): void {
   if (!app.isPackaged) return
 
+  stopUpdateChecks()
+
   const autoUpdater = getUpdater()
 
-  setTimeout(() => {
+  initialCheckTimer = setTimeout(() => {
+    initialCheckTimer = null
+
     void autoUpdater.checkForUpdates().catch((error) => {
       setState({ status: 'error', error: safeError(error) })
     })
   }, 5000)
 
-  setInterval(() => {
+  periodicCheckTimer = setInterval(() => {
     void autoUpdater.checkForUpdates().catch(() => {})
   }, 30 * 60 * 1000)
 }

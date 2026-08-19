@@ -1,7 +1,7 @@
-import type { UpdaterState as ConcordUpdaterState } from '../../types/concord'
+import type { UpdaterState as HarmonyUpdaterState } from '../../types/harmony'
 
 interface UpdateBannerProps {
-  state: ConcordUpdaterState
+  state: HarmonyUpdaterState
   visible: boolean
   download: () => Promise<boolean>
   install: () => Promise<boolean>
@@ -36,7 +36,7 @@ export function UpdateBanner({ state, visible, download, install, dismiss }: Upd
             ? 'Atualização pronta'
             : errored
               ? 'Não foi possível atualizar'
-              : `Concord ${state.availableVersion || ''} disponível`}
+              : `Harmony ${state.availableVersion || ''} disponível`}
         </strong>
         <span>
           {downloading

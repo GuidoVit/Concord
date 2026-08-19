@@ -58,6 +58,11 @@ const roomService =
     LIVEKIT_API_SECRET
   )
 
+// Mantém o instante em que uma call passou de vazia para ativa.
+// Se o backend reiniciar, o horário é reconstruído na primeira consulta.
+const voiceSessionState =
+  new Map()
+
 const JWT_SECRET =
   process.env.JWT_SECRET ||
   'concord-development-secret-change-this-later'
@@ -472,6 +477,9 @@ async function start() {
       allowedHeaders: [
         'Content-Type',
         'Authorization',
+        'X-Harmony-File-Name',
+        'X-Harmony-File-Type',
+        'X-Harmony-File-Kind',
         'X-Concord-File-Name',
         'X-Concord-File-Type',
         'X-Concord-File-Kind'
@@ -489,7 +497,7 @@ async function start() {
     '/health',
     async () => ({
       ok: true,
-      app: 'Concord API'
+      app: 'Harmony API'
     })
   )
 
@@ -513,13 +521,13 @@ async function start() {
 
       let originalName = 'arquivo'
       try {
-        originalName = decodeURIComponent(String(request.headers['x-concord-file-name'] || 'arquivo'))
+        originalName = decodeURIComponent(String(request.headers['x-harmony-file-name'] || request.headers['x-concord-file-name'] || 'arquivo'))
       } catch {
         originalName = 'arquivo'
       }
 
-      const mimeType = String(request.headers['x-concord-file-type'] || 'application/octet-stream').slice(0, 120)
-      const kind = String(request.headers['x-concord-file-kind'] || '')
+      const mimeType = String(request.headers['x-harmony-file-type'] || request.headers['x-concord-file-type'] || 'application/octet-stream').slice(0, 120)
+      const kind = String(request.headers['x-harmony-file-kind'] || request.headers['x-concord-file-kind'] || '')
 
       if (!['image', 'video', 'sticker'].includes(kind)) {
         return reply.code(400).send({ error: 'Tipo de anexo inválido.' })
@@ -1881,6 +1889,10 @@ async function start() {
               JSON.stringify({
                 avatarUrl:
                   user.avatarUrl ||
+                  '',
+
+                username:
+                  user.username ||
                   ''
               }),
 
@@ -1902,6 +1914,9 @@ async function start() {
           true,
 
         canPublishData:
+          true,
+
+        canUpdateOwnMetadata:
           true
       })
 
@@ -1916,7 +1931,7 @@ async function start() {
     }
   )
 
-    // ====================================================
+  // ====================================================
   // PRESENÇA NOS CANAIS DE VOZ
   // ====================================================
 
@@ -1931,19 +1946,13 @@ async function start() {
       request,
       reply
     ) => {
-      const serverId =
-        request.params
-          .serverId
-
-      const servers =
-        readServers()
-
       const server =
-        servers.find(
-          (item) =>
-            item.id ===
-            serverId
-        )
+        readServers()
+          .find(
+            (item) =>
+              item.id ===
+              request.params.serverId
+          )
 
       if (
         !server ||
@@ -1989,94 +1998,208 @@ async function start() {
                     roomName
                   )
 
+              if (
+                participants.length ===
+                0
+              ) {
+                voiceSessionState
+                  .delete(
+                    roomName
+                  )
+
+                presence[
+                  channel.id
+                ] = {
+                  participants: [],
+                  startedAt: null
+                }
+
+                return
+              }
+
+              const currentParticipantIds =
+                participants.map(
+                  (participant) =>
+                    participant.identity
+                )
+
+              let session =
+                voiceSessionState
+                  .get(
+                    roomName
+                  )
+
+              const sameContinuousCall =
+                Boolean(
+                  session &&
+                  Array.isArray(
+                    session.participantIds
+                  ) &&
+                  session.participantIds.some(
+                    (identity) =>
+                      currentParticipantIds.includes(
+                        identity
+                      )
+                  )
+                )
+
+              if (
+                !session ||
+                !sameContinuousCall
+              ) {
+                const joinedTimes =
+                  participants
+                    .map(
+                      (participant) => {
+                        const joinedAtMs =
+                          Number(
+                            participant.joinedAtMs ||
+                            0
+                          )
+
+                        if (
+                          Number.isFinite(
+                            joinedAtMs
+                          ) &&
+                          joinedAtMs > 0
+                        ) {
+                          return joinedAtMs
+                        }
+
+                        const joinedAtSeconds =
+                          Number(
+                            participant.joinedAt ||
+                            0
+                          )
+
+                        return (
+                          Number.isFinite(
+                            joinedAtSeconds
+                          ) &&
+                          joinedAtSeconds > 0
+                        )
+                          ? joinedAtSeconds * 1000
+                          : Date.now()
+                      }
+                    )
+
+                session = {
+                  startedAt:
+                    Math.min(
+                      ...joinedTimes
+                    ),
+
+                  participantIds:
+                    currentParticipantIds
+                }
+              } else {
+                session = {
+                  ...session,
+                  participantIds:
+                    currentParticipantIds
+                }
+              }
+
+              voiceSessionState
+                .set(
+                  roomName,
+                  session
+                )
+
               presence[
                 channel.id
-              ] =
-                participants.map(
-                  (
-                    participant
-                  ) => {
-                    let avatarUrl =
-                      ''
+              ] = {
+                participants:
+                  participants.map(
+                    (
+                      participant
+                    ) => {
+                      let metadata = {}
 
-                    try {
-                      const metadata =
-                        participant.metadata
-                          ? JSON.parse(
-                              participant.metadata
-                            )
-                          : null
+                      try {
+                        metadata =
+                          participant.metadata
+                            ? JSON.parse(
+                                participant.metadata
+                              )
+                            : {}
+                      } catch {
+                        metadata = {}
+                      }
 
-                      avatarUrl =
-                        typeof metadata
-                          ?.avatarUrl ===
-                        'string'
-                          ? metadata
-                              .avatarUrl
-                          : ''
-                    } catch {
-                      avatarUrl =
-                        ''
+                      const storedUser =
+                        getUserById(
+                          participant.identity
+                        )
+
+                      const attributes =
+                        participant.attributes ||
+                        {}
+
+                      return {
+                        identity:
+                          participant.identity,
+
+                        name:
+                          participant.name ||
+                          storedUser?.displayName ||
+                          participant.identity,
+
+                        username:
+                          metadata.username ||
+                          storedUser?.username ||
+                          '',
+
+                        avatarUrl:
+                          metadata.avatarUrl ||
+                          storedUser?.avatarUrl ||
+                          '',
+
+                        isMuted:
+                          attributes[
+                            'harmony.muted'
+                          ] ===
+                          'true',
+
+                        isDeafened:
+                          attributes[
+                            'harmony.deafened'
+                          ] ===
+                          'true'
+                      }
                     }
+                  ),
 
-                    /*
-                     * Fallback usando os dados armazenados
-                     * no próprio Concord.
-                     *
-                     * Assim, mesmo se uma sala antiga não
-                     * tiver metadata de avatar no LiveKit,
-                     * ainda conseguimos mostrar a foto.
-                     */
-                    const storedUser =
-                      getUserById(
-                        participant.identity
-                      )
-
-                    return {
-                      identity:
-                        participant.identity,
-
-                      name:
-                        participant.name ||
-                        storedUser
-                          ?.displayName ||
-                        participant.identity,
-
-                      avatarUrl:
-                        avatarUrl ||
-                        storedUser
-                          ?.avatarUrl ||
-                        ''
-                    }
-                  }
-                )
+                startedAt:
+                  new Date(
+                    session.startedAt
+                  ).toISOString()
+              }
             } catch (
               error
             ) {
-              /*
-               * Se a sala ainda não existe ou está vazia,
-               * para o Concord isso simplesmente significa
-               * que não existe ninguém nesse canal.
-               */
-              app.log.debug(
-                {
-                  roomName,
-
-                  error:
-                    error instanceof Error
-                      ? error.message
-                      : String(
-                          error
-                        )
-                },
-
-                'Concord: sala de voz sem presença disponível.'
-              )
+              voiceSessionState
+                .delete(
+                  roomName
+                )
 
               presence[
                 channel.id
-              ] =
-                []
+              ] = {
+                participants: [],
+                startedAt: null
+              }
+
+              app.log.debug(
+                {
+                  roomName,
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : String(error)
+                },
+                'Harmony: sala de voz sem presença disponível.'
+              )
             }
           }
         )
@@ -2087,7 +2210,6 @@ async function start() {
       }
     }
   )
-
 
   // ====================================================
   // SERVIDOR DETALHADO
@@ -3206,7 +3328,7 @@ async function start() {
     })
 
     console.log(
-      `Concord API rodando em http://127.0.0.1:${PORT}`
+      `Harmony API rodando em http://127.0.0.1:${PORT}`
     )
   } catch (error) {
     app.log.error(

@@ -7,9 +7,9 @@ import {
 import './App.css'
 
 import type {
-  ConcordServer,
+  HarmonyServer,
   Screen
-} from './types/concord'
+} from './types/harmony'
 import { Modal } from './components/common/Modal'
 import { AuthScreen } from './components/auth/AuthScreen'
 import { ServerRail } from './components/layout/ServerRail'
@@ -168,8 +168,12 @@ function App() {
     connectedChannelId,
     participantVolumes,
     screenShareVolumes,
+    selfMicGain,
+    joinMuted,
     setParticipantVolume,
     setScreenShareVolume,
+    setSelfMicGain,
+    setJoinMuted,
     connectVoice,
     toggleMicrophone,
     toggleDeafen
@@ -236,7 +240,7 @@ function App() {
     }
   }
 
-  async function openServer(server: ConcordServer) {
+  async function openServer(server: HarmonyServer) {
     // A call continua ativa em segundo plano ao navegar entre servidores.
     setSelectedServer(server)
     setScreen('server')
@@ -429,6 +433,9 @@ function App() {
             server={
               selectedServer
             }
+            user={user}
+            friends={friends}
+            sendFriendRequest={sendFriendRequest}
             muted={
               muted
             }
@@ -448,8 +455,10 @@ function App() {
             connectedChannelId={connectedChannelId}
             participantVolumes={participantVolumes}
             screenShareVolumes={screenShareVolumes}
+            selfMicGain={selfMicGain}
             setParticipantVolume={setParticipantVolume}
             setScreenShareVolume={setScreenShareVolume}
+            setSelfMicGain={setSelfMicGain}
             screenSharing={
               screenSharing
             }
@@ -483,7 +492,6 @@ function App() {
               stopScreenShare
             }
             copyInvite={copyInvite}
-            user={user}
             onServerChange={updateServer}
             onServerDeleted={() => { setSelectedServer(null); setScreen('home'); void loadServers() }}
           />
@@ -501,7 +509,7 @@ function App() {
       )}
 
       {showProfileSettings && (
-        <Modal title="Configurações do Concord" close={() => setShowProfileSettings(false)}>
+        <Modal title="Configurações do Harmony" close={() => setShowProfileSettings(false)}>
           <label className="settings-label">Nome de exibição</label>
           <input className="modal-input" value={profileDisplayName} onChange={(e) => setProfileDisplayName(e.target.value)} />
           <label className="settings-label">Nome de usuário</label>
@@ -518,6 +526,9 @@ function App() {
             setSecondary={themePalette.setSecondary}
             setPalette={themePalette.setPalette}
             resetPalette={themePalette.resetPalette}
+            commitPalette={themePalette.commitPalette}
+            joinMuted={joinMuted}
+            setJoinMuted={setJoinMuted}
           />
         </Modal>
       )}

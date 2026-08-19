@@ -1,5 +1,5 @@
 appId: com.concord.app
-productName: Concord
+productName: Harmony
 
 directories:
   buildResources: build
@@ -20,13 +20,13 @@ extraResources:
     to: resources
 
 win:
-  executableName: Concord
+  executableName: Harmony
   icon: build/icon.ico
   target:
     - nsis
 
 nsis:
-  artifactName: Concord-${version}-setup.${ext}
+  artifactName: Harmony-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
@@ -49,7 +49,7 @@ mac:
   notarize: false
 
 dmg:
-  artifactName: Concord-${version}.${ext}
+  artifactName: Harmony-${version}.${ext}
 
 linux:
   icon: build/icon.png
@@ -60,6 +60,6 @@ linux:
   category: Network
 
 appImage:
-  artifactName: Concord-${version}.${ext}
+  artifactName: Harmony-${version}.${ext}
 
 npmRebuild: false

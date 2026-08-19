@@ -8,8 +8,10 @@ import {
 export const DEFAULT_PRIMARY = '#27e0b3'
 export const DEFAULT_SECONDARY = '#f6c945'
 
-const PRIMARY_KEY = 'concord-theme-primary'
-const SECONDARY_KEY = 'concord-theme-secondary'
+const PRIMARY_KEY = 'harmony-theme-primary'
+const SECONDARY_KEY = 'harmony-theme-secondary'
+const LEGACY_PRIMARY_KEY = 'concord-theme-primary'
+const LEGACY_SECONDARY_KEY = 'concord-theme-secondary'
 
 function normalizeHex(value: string, fallback: string) {
   return /^#[0-9a-f]{6}$/i.test(value)
@@ -69,7 +71,7 @@ function applyVisualPalette(
   )
 
   root.style.setProperty(
-    '--concord-gradient',
+    '--harmony-gradient',
     `linear-gradient(135deg, ${secondary}, ${primary})`
   )
 }
@@ -78,24 +80,23 @@ function notifyMascot(
   primary: string,
   secondary: string
 ) {
-  window.dispatchEvent(
-    new CustomEvent('concord-theme-change', {
-      detail: { primary, secondary }
-    })
-  )
+  const detail = { primary, secondary }
+  window.dispatchEvent(new CustomEvent('harmony-theme-change', { detail }))
+  // Evento legado mantido durante a migração Harmony → Harmony.
+  window.dispatchEvent(new CustomEvent('concord-theme-change', { detail }))
 }
 
 export function useThemePalette() {
   const [primary, setPrimaryState] = useState(() =>
     normalizeHex(
-      localStorage.getItem(PRIMARY_KEY) || '',
+      localStorage.getItem(PRIMARY_KEY) || localStorage.getItem(LEGACY_PRIMARY_KEY) || '',
       DEFAULT_PRIMARY
     )
   )
 
   const [secondary, setSecondaryState] = useState(() =>
     normalizeHex(
-      localStorage.getItem(SECONDARY_KEY) || '',
+      localStorage.getItem(SECONDARY_KEY) || localStorage.getItem(LEGACY_SECONDARY_KEY) || '',
       DEFAULT_SECONDARY
     )
   )
@@ -143,7 +144,7 @@ export function useThemePalette() {
     )
 
     /*
-     * Ao abrir o Concord, o mascote recebe apenas
+     * Ao abrir o Harmony, o mascote recebe apenas
      * a última paleta já salva.
      */
     notifyMascot(
@@ -220,15 +221,11 @@ export function useThemePalette() {
       const latest =
         latestRef.current
 
-      localStorage.setItem(
-        PRIMARY_KEY,
-        latest.primary
-      )
+      localStorage.setItem(PRIMARY_KEY, latest.primary)
+      localStorage.setItem(LEGACY_PRIMARY_KEY, latest.primary)
 
-      localStorage.setItem(
-        SECONDARY_KEY,
-        latest.secondary
-      )
+      localStorage.setItem(SECONDARY_KEY, latest.secondary)
+      localStorage.setItem(LEGACY_SECONDARY_KEY, latest.secondary)
 
       notifyMascot(
         latest.primary,
@@ -273,15 +270,11 @@ export function useThemePalette() {
         nextSecondary
       )
 
-      localStorage.setItem(
-        PRIMARY_KEY,
-        nextPrimary
-      )
+      localStorage.setItem(PRIMARY_KEY, nextPrimary)
+      localStorage.setItem(LEGACY_PRIMARY_KEY, nextPrimary)
 
-      localStorage.setItem(
-        SECONDARY_KEY,
-        nextSecondary
-      )
+      localStorage.setItem(SECONDARY_KEY, nextSecondary)
+      localStorage.setItem(LEGACY_SECONDARY_KEY, nextSecondary)
 
       /*
        * Presets são cliques únicos,
