@@ -75,6 +75,14 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     readBooleanSetting('harmony-join-muted', 'concord-join-muted', false)
   )
 
+  const [echoCancellation, setEchoCancellationState] = useState(() =>
+    readBooleanSetting('harmony-echo-cancellation', 'concord-echo-cancellation', true)
+  )
+
+  const [noiseSuppression, setNoiseSuppressionState] = useState(() =>
+    readBooleanSetting('harmony-noise-suppression', 'concord-noise-suppression', true)
+  )
+
   // Medidor do próprio microfone.
   const audioContextRef = useRef<AudioContext | null>(null)
   const microphoneSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
@@ -544,6 +552,42 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     localStorage.setItem('concord-join-muted', String(value))
   }, [])
 
+  const setEchoCancellation = useCallback(async (value: boolean) => {
+    setEchoCancellationState(value)
+    localStorage.setItem('harmony-echo-cancellation', String(value))
+    localStorage.setItem('concord-echo-cancellation', String(value))
+
+    const rawTrack = micRawTrackRef.current
+    if (rawTrack) {
+      try {
+        await rawTrack.applyConstraints({
+          echoCancellation: value,
+          noiseSuppression
+        })
+      } catch (error) {
+        console.warn('Harmony: não foi possível aplicar cancelamento de eco em tempo real:', error)
+      }
+    }
+  }, [noiseSuppression])
+
+  const setNoiseSuppression = useCallback(async (value: boolean) => {
+    setNoiseSuppressionState(value)
+    localStorage.setItem('harmony-noise-suppression', String(value))
+    localStorage.setItem('concord-noise-suppression', String(value))
+
+    const rawTrack = micRawTrackRef.current
+    if (rawTrack) {
+      try {
+        await rawTrack.applyConstraints({
+          echoCancellation,
+          noiseSuppression: value
+        })
+      } catch (error) {
+        console.warn('Harmony: não foi possível aplicar supressão de ruído em tempo real:', error)
+      }
+    }
+  }, [echoCancellation])
+
   const cleanupProcessedMicrophone = useCallback(async () => {
     try { micProcessSourceRef.current?.disconnect() } catch {}
     micProcessSourceRef.current = null
@@ -566,9 +610,13 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
       try {
         const input = await navigator.mediaDevices.getUserMedia({
           audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
+            /*
+             * Processamento leve do próprio WebRTC/Chromium.
+             * AGC fica desligado para não comprimir/agredir demais a voz.
+             */
+            echoCancellation,
+            noiseSuppression,
+            autoGainControl: false,
             channelCount: 1
           },
           video: false
@@ -619,7 +667,12 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
         await room.localParticipant.setMicrophoneEnabled(!startMuted)
       }
     },
-    [cleanupProcessedMicrophone, selfMicGain]
+    [
+      cleanupProcessedMicrophone,
+      echoCancellation,
+      noiseSuppression,
+      selfMicGain
+    ]
   )
 
   const publishLocalState = useCallback(
@@ -883,6 +936,8 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     screenShareVolumes,
     selfMicGain,
     joinMuted,
+    echoCancellation,
+    noiseSuppression,
     connectVoice,
     disconnectVoice,
     toggleMicrophone,
@@ -891,6 +946,8 @@ export function useVoice({ user, apiRequest }: UseVoiceOptions) {
     setScreenShareVolume,
     setActiveScreenShareAudio,
     setSelfMicGain,
-    setJoinMuted
+    setJoinMuted,
+    setEchoCancellation,
+    setNoiseSuppression
   }
 }

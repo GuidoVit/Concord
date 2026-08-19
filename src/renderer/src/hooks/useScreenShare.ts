@@ -328,10 +328,29 @@ export function useScreenShare({
           publication = await livekitRoom.localParticipant.setScreenShareEnabled(
             true,
             {
-              audio: true,
+              audio: {
+                /*
+                 * Chromium/LiveKit: tenta excluir do áudio capturado aquilo
+                 * que o próprio participante está ouvindo no Harmony.
+                 * Quando suportado, evita que a voz da call volte pela transmissão.
+                 */
+                restrictOwnAudio:
+                  (localStorage.getItem('harmony-screen-echo-protection') ?? 'true') !== 'false',
+
+                /*
+                 * Áudio de sistema não deve receber filtros de microfone:
+                 * preserva música, jogos e filmes.
+                 */
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+                channelCount: 2,
+                sampleRate: 48000
+              },
               video: true,
               contentHint: 'motion',
               systemAudio: 'include',
+              suppressLocalAudioPlayback: false,
               resolution: {
                 width: profile.width,
                 height: profile.height,

@@ -10,6 +10,10 @@ interface AppearanceSettingsProps {
   commitPalette: () => void
   joinMuted: boolean
   setJoinMuted: (value: boolean) => void
+  echoCancellation: boolean
+  setEchoCancellation: (value: boolean) => void
+  noiseSuppression: boolean
+  setNoiseSuppression: (value: boolean) => void
 }
 
 const PRESETS = [
@@ -30,10 +34,17 @@ export function AppearanceSettings({
   resetPalette,
   commitPalette,
   joinMuted,
-  setJoinMuted
+  setJoinMuted,
+  echoCancellation,
+  setEchoCancellation,
+  noiseSuppression,
+  setNoiseSuppression
 }: AppearanceSettingsProps) {
   const [compatibilityMode, setCompatibilityMode] = useState(false)
   const [compatibilityChanged, setCompatibilityChanged] = useState(false)
+  const [screenEchoProtection, setScreenEchoProtection] = useState(
+    () => (localStorage.getItem('harmony-screen-echo-protection') ?? 'true') !== 'false'
+  )
 
   useEffect(() => {
     void window.harmony.compatibility.getVideoMode().then((enabled) => {
@@ -45,6 +56,11 @@ export function AppearanceSettings({
     setCompatibilityMode(enabled)
     await window.harmony.compatibility.setVideoMode(enabled)
     setCompatibilityChanged(true)
+  }
+
+  const changeScreenEchoProtection = (enabled: boolean) => {
+    setScreenEchoProtection(enabled)
+    localStorage.setItem('harmony-screen-echo-protection', String(enabled))
   }
 
   return (
@@ -143,6 +159,48 @@ export function AppearanceSettings({
             type="checkbox"
             checked={joinMuted}
             onChange={(event) => setJoinMuted(event.currentTarget.checked)}
+          />
+        </label>
+
+        <label className="settings-toggle-row">
+          <div>
+            <strong>Cancelamento de eco leve</strong>
+            <span>
+              Usa o cancelamento nativo do WebRTC no seu microfone. Recomendado para chamadas com caixas de som ou microfone sensível.
+            </span>
+          </div>
+          <input
+            type="checkbox"
+            checked={echoCancellation}
+            onChange={(event) => setEchoCancellation(event.currentTarget.checked)}
+          />
+        </label>
+
+        <label className="settings-toggle-row">
+          <div>
+            <strong>Supressão de ruído leve</strong>
+            <span>
+              Reduz ventilador, teclado e ruídos constantes sem aplicar processamento agressivo à sua voz.
+            </span>
+          </div>
+          <input
+            type="checkbox"
+            checked={noiseSuppression}
+            onChange={(event) => setNoiseSuppression(event.currentTarget.checked)}
+          />
+        </label>
+
+        <label className="settings-toggle-row">
+          <div>
+            <strong>Evitar eco da call na transmissão</strong>
+            <span>
+              Tenta impedir que as vozes reproduzidas pelo próprio Harmony voltem para o áudio do compartilhamento. Recomendado.
+            </span>
+          </div>
+          <input
+            type="checkbox"
+            checked={screenEchoProtection}
+            onChange={(event) => changeScreenEchoProtection(event.currentTarget.checked)}
           />
         </label>
 

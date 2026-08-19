@@ -170,10 +170,14 @@ function App() {
     screenShareVolumes,
     selfMicGain,
     joinMuted,
+    echoCancellation,
+    noiseSuppression,
     setParticipantVolume,
     setScreenShareVolume,
     setSelfMicGain,
     setJoinMuted,
+    setEchoCancellation,
+    setNoiseSuppression,
     connectVoice,
     toggleMicrophone,
     toggleDeafen
@@ -529,6 +533,10 @@ function App() {
             commitPalette={themePalette.commitPalette}
             joinMuted={joinMuted}
             setJoinMuted={setJoinMuted}
+            echoCancellation={echoCancellation}
+            setEchoCancellation={(value) => void setEchoCancellation(value)}
+            noiseSuppression={noiseSuppression}
+            setNoiseSuppression={(value) => void setNoiseSuppression(value)}
           />
         </Modal>
       )}
